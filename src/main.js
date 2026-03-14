@@ -197,6 +197,8 @@ const EVENT_DEFS = [
   { id: "charter-flight", title: "Charter Flight", subtitle: "Late-Board Express", icon: "✈", badge: "MOVE", eventType: "acquisition-flight", copy: "Advance to the next landmark, collect a $60 route bonus, and resolve it immediately." },
 ];
 
+const AI_NAMES = ["Magnus AI", "Atlas Bot", "Oracle AI", "Apex Bot", "Profit Bot", "Wall St AI"];
+
 // ── Synthesized sound effects (Web Audio API — no files needed) ───────────
 let _audioCtx = null;
 function _getAudioCtx() {
@@ -549,6 +551,7 @@ function renderPlayerFields(count) {
     const wrapper = document.createElement("div");
     wrapper.className = "player-field-row";
     wrapper.dataset.selectedColor = defaultColorIndex;
+    wrapper.dataset.isAi = "0";
     wrapper.innerHTML = `
       <div class="player-field-header">
         <span class="player-field-num" style="background:${COLOR_PALETTE[defaultColorIndex].color}; color:#07131e;">P${index + 1}</span>
@@ -560,6 +563,7 @@ function renderPlayerFields(count) {
           autocomplete="off"
           class="player-name-input"
         />
+        <button type="button" class="ai-toggle-btn" data-player-index="${index}" onclick="toggleAIPlayer(this)">🤖 AI</button>
       </div>
       <div class="color-swatch-row">
         ${COLOR_PALETTE.map((c, ci) => `
@@ -602,6 +606,22 @@ function attachSwatchListeners() {
   updateSwatchTakenStates(allRows);
 }
 
+function toggleAIPlayer(btn) {
+  const row = btn.closest(".player-field-row");
+  const nowAI = row.dataset.isAi !== "1";
+  row.dataset.isAi = nowAI ? "1" : "0";
+  btn.classList.toggle("active", nowAI);
+  const nameInput = row.querySelector(".player-name-input");
+  const idx = parseInt(btn.dataset.playerIndex, 10);
+  if (nowAI) {
+    nameInput.value    = AI_NAMES[idx % AI_NAMES.length];
+    nameInput.disabled = true;
+  } else {
+    nameInput.value    = `Investor ${idx + 1}`;
+    nameInput.disabled = false;
+  }
+}
+
 function updateSwatchTakenStates(allRows) {
   const takenIndices = new Set(allRows.map((r) => Number(r.dataset.selectedColor)));
 
@@ -624,10 +644,11 @@ function handleSetupSubmit(event) {
   const colorIndices = rows.map((row) => Number(row.dataset.selectedColor));
 
   const turnTimerSeconds = Number(document.querySelector('input[name="uiTurnTimer"]:checked')?.value ?? 0);
-  startGame(names, colorIndices, turnTimerSeconds);
+  const aiFlags = rows.map(row => row.dataset.isAi === "1");
+  startGame(names, colorIndices, turnTimerSeconds, aiFlags);
 }
 
-function startGame(names, colorIndices = [], turnTimerSeconds = 0) {
+function startGame(names, colorIndices = [], turnTimerSeconds = 0, aiFlags = []) {
   resetVirtualClock();
   state.players = names.map((name, index) => {
     const paletteIndex = colorIndices[index] ?? index % COLOR_PALETTE.length;
@@ -643,6 +664,7 @@ function startGame(names, colorIndices = [], turnTimerSeconds = 0) {
     position: 0,
     skipTurns: 0,
     bankrupt: false,
+    isAI: aiFlags[index] ?? false,
     inventory: [],
     activeEffects: [],
     };
@@ -675,6 +697,10 @@ function startGame(names, colorIndices = [], turnTimerSeconds = 0) {
   ui.winnerOverlay.classList.add("hidden");
   primeAudio();
   render();
+  // Show first-turn announce, then trigger AI if first player is AI
+  showTurnAnnounce(currentPlayer());
+  if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+  if (currentPlayer()?.isAI) setTimeout(runAITurn, 1800);
 }
 
 function render() {
@@ -2079,6 +2105,7 @@ function handleEndTurn() {
     state.turnStarted = false;
     state.shopStock = generateShopStock();
     render();
+    if (player.isAI) setTimeout(runAITurn, 1200);
     return;
   }
 
@@ -2124,6 +2151,7 @@ function handleEndTurn() {
       if (state.turnTimerSeconds > 0) {
         setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
       }
+      if (currentPlayer().isAI) setTimeout(runAITurn, 1800);
     }
     return;
   }
@@ -2522,18 +2550,31 @@ function resetVirtualClock() {
   virtualClock.timers = [];
 }
 
+// ── Turn announce + countdown positioning ─────────────────────────────────
+function _positionOnBoard(elId) {
+  const el = document.getElementById(elId);
+  const bc = document.querySelector(".board-center");
+  if (!el || !bc) return;
+  const r = bc.getBoundingClientRect();
+  el.style.left      = `${r.left + r.width  / 2}px`;
+  el.style.top       = `${r.top  + r.height / 2}px`;
+  el.style.transform = "translate(-50%, -50%)";
+}
+
 // ── Turn announce ─────────────────────────────────────────────────────────
 function showTurnAnnounce(player) {
   const el = document.getElementById("turnAnnounce");
   if (!el || !player) return;
   const color = player.color || "#efc77b";
   const glow  = player.glow  || "rgba(239,199,123,0.5)";
+  const aiTag = player.isAI ? ` <span style="font-size:0.6em;opacity:0.7;">🤖</span>` : "";
   el.innerHTML = `
     <div class="turn-announce-inner" style="--player-color:${color};--player-glow:${glow};">
       <div class="turn-announce-aura"></div>
-      <span class="turn-announce-name" style="color:${color};">${player.name}</span>
+      <span class="turn-announce-name" style="color:${color};">${player.name}${aiTag}</span>
       <span class="turn-announce-label">Your Turn!</span>
     </div>`;
+  _positionOnBoard("turnAnnounce");
   el.classList.remove("hidden", "turn-announce-exit");
   el.classList.add("turn-announce-enter");
   playSound("turn_start");
@@ -2548,6 +2589,7 @@ function showTurnAnnounce(player) {
 function startTurnTimer(seconds) {
   stopTurnTimer();
   _cdRemaining = seconds;
+  _positionOnBoard("turnCountdown");
   _renderCountdown();
   const el = document.getElementById("turnCountdown");
   if (el) el.classList.remove("hidden");
@@ -2605,6 +2647,42 @@ function autoAdvanceTurn() {
   if (!state.turnStarted) {
     handleRoll();
   } else {
+    handleEndTurn();
+  }
+}
+
+// ── AI turn logic ─────────────────────────────────────────────────────────
+async function runAITurn() {
+  const player = currentPlayer();
+  if (!player?.isAI || state.gameOver || state.turnBusy || state.turnStarted) return;
+
+  await delay(1100); // brief pause so humans can follow
+  if (!currentPlayer()?.isAI || state.gameOver) return;
+
+  await handleRoll();
+
+  // Wait briefly then decide post-roll action
+  await delay(700);
+  const p = currentPlayer();
+  if (!p?.isAI || state.gameOver || !state.turnStarted) return;
+
+  const pending = state.pendingAction;
+  if (pending?.type === "buy") {
+    const lm = getLandmark(pending.landmarkId);
+    if (p.cash >= lm.cost) {
+      buyLandmark(lm.id);
+      await delay(600);
+    }
+  } else if (pending?.type === "upgrade") {
+    const lm = getLandmark(pending.landmarkId);
+    if (p.cash >= lm.upgradeCost) {
+      handleUpgrade(lm.id);
+      await delay(600);
+    }
+  }
+
+  if (!state.gameOver && state.turnStarted) {
+    await delay(400);
     handleEndTurn();
   }
 }
