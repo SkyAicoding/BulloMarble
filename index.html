@@ -149,16 +149,7 @@
             <div class="name-grid" id="playerFields"></div>
           </div>
 
-          <!-- 2-3: Instructions -->
-          <div class="setup-section setup-notes">
-            <span>🖥 Hot-seat play on one device</span>
-            <span>🔄 Corner route: START → TAX → FREE PARKING → WORLD EVENT</span>
-            <span>📈 Board flow: early attractions → mid landmarks → late skyline giants</span>
-            <span>🏆 20-round summit or 4 Global Landmarks triggers the final audit</span>
-            <span>💰 Ranking = cash + landmark value + upgrade value</span>
-          </div>
-
-          <!-- 2-3b: Turn Timer -->
+          <!-- 2-3: Turn Timer -->
           <div class="setup-section">
             <p class="setup-section-label">Turn Timer</p>
             <div class="player-count-radios" id="turnTimerRadios">
@@ -169,8 +160,20 @@
             </div>
           </div>
 
-          <!-- 2-4: Launch -->
-          <button class="primary-button launch-button" type="submit">Launch Game</button>
+          <!-- 2-4: Instructions -->
+          <div class="setup-section setup-notes">
+            <span>🖥 Hot-seat play on one device</span>
+            <span>🔄 Corner route: START → TAX → FREE PARKING → WORLD EVENT</span>
+            <span>📈 Board flow: early attractions → mid landmarks → late skyline giants</span>
+            <span>🏆 20-round summit or 4 Global Landmarks triggers the final audit</span>
+            <span>💰 Ranking = cash + landmark value + upgrade value</span>
+          </div>
+
+          <!-- 2-5: Launch -->
+          <div class="setup-launch-row">
+            <button type="button" class="secondary-button" onclick="backToModeSelect()">← Mode Select</button>
+            <button class="primary-button launch-button" type="submit">Launch Game</button>
+          </div>
 
         </form>
       </div>

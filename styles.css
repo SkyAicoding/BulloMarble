@@ -2586,6 +2586,15 @@ button {
   gap: 0.5rem;
 }
 
+.setup-launch-row {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+.setup-launch-row .launch-button {
+  flex: 1;
+}
+
 .setup-notes span {
   font-size: 0.78rem;
   color: var(--text-dim);

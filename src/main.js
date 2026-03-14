@@ -636,6 +636,11 @@ function updateSwatchTakenStates(allRows) {
   });
 }
 
+function backToModeSelect() {
+  ui.setupOverlay.classList.add("hidden");
+  ui.modeOverlay.classList.remove("hidden");
+}
+
 function handleSetupSubmit(event) {
   event.preventDefault();
   const count = Number(ui.playerCountSelect.value);
@@ -697,10 +702,12 @@ function startGame(names, colorIndices = [], turnTimerSeconds = 0, aiFlags = [])
   ui.winnerOverlay.classList.add("hidden");
   primeAudio();
   render();
-  // Show first-turn announce, then trigger AI if first player is AI
-  showTurnAnnounce(currentPlayer());
-  if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
-  if (currentPlayer()?.isAI) setTimeout(runAITurn, 1800);
+  // Defer one frame so .board-center is laid out before positioning
+  requestAnimationFrame(() => {
+    showTurnAnnounce(currentPlayer());
+    if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+    if (currentPlayer()?.isAI) setTimeout(runAITurn, 1800);
+  });
 }
 
 function render() {
@@ -1030,15 +1037,6 @@ function renderBoardCenter() {
   const center = document.createElement("section");
   center.className = "board-center";
   center.style.gridArea = "2 / 2 / 11 / 11";
-  center.innerHTML = `
-    <div class="center-default">
-      <div class="center-logo-ring">
-        <span class="center-logo-glyph">🌏</span>
-      </div>
-      <p class="eyebrow">BulloMarble</p>
-      <h2 class="center-brand-title">Global Investment Arena</h2>
-    </div>
-  `;
   return center;
 }
 
@@ -3977,3 +3975,6 @@ window.lobbyJoinByCode       = lobbyJoinByCode;
 window.lobbyCreateRoom       = lobbyCreateRoom;
 window.lobbyJoinRoom         = lobbyJoinRoom;
 window.lobbyStartGame        = lobbyStartGame;
+window.toggleAIPlayer          = toggleAIPlayer;
+window.lobbyWaitingChangeColor = lobbyWaitingChangeColor;
+window.backToModeSelect        = backToModeSelect;
