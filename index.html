@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BulloMarble</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307131e'/%3E%3Cpath d='M14 46h36L32 12z' fill='%23efc77b'/%3E%3Ccircle cx='32' cy='26' r='7' fill='%2307131e'/%3E%3C/svg%3E"
+    />
+    <link rel="preload" as="image" href="assets/ui/world-landmark-main-board.png" />
+    <link rel="stylesheet" href="styles.css?v=20260315-v1.0" />
+    <!-- Socket.io client — served by Node server; silently skipped when opened via file:// -->
+    <script src="/socket.io/socket.io.js" onerror="window._socketIOUnavailable=true"></script>
+    <script type="module" src="src/main.js?v=20260315-v1.0"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="layout">
+
+        <!-- ── LEFT SIDEBAR ── -->
+        <aside class="left-sidebar">
+          <div class="sidebar-brand">
+            <p class="eyebrow">Bull × Marble</p>
+            <h1 class="sidebar-title">BulloMarble</h1>
+          </div>
+
+          <div class="sidebar-round">
+            <div class="metric-pill round-pill">
+              <span class="metric-label">Round</span>
+              <strong id="roundLabel">1</strong>
+            </div>
+          </div>
+
+          <nav class="sidebar-menu">
+            <button class="menu-btn" id="homeButton" type="button">⌂ Setup</button>
+            <button class="menu-btn" id="stopGameButton" type="button">✕ End Game</button>
+          </nav>
+
+          <div class="players-panel" id="playersStrip"></div>
+
+          <!-- Hidden — keeps JS working without showing the button -->
+          <button class="hidden" id="muteToggle" type="button">Sound On</button>
+        </aside>
+
+        <!-- ── CENTER BOARD ── -->
+        <section class="board-stage">
+          <div class="board-frame">
+            <div class="board-table">
+              <div class="board-grid" id="board"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── RIGHT PANEL ── -->
+        <aside class="action-dock">
+          <section class="panel action-panel">
+
+            <div class="dock-section event-section">
+              <span class="metric-label">Global Event</span>
+              <strong id="eventLabel">Board ready for launch</strong>
+            </div>
+
+            <section class="dock-section selected-panel" id="selectedSpaceCard"></section>
+            <section class="dock-section player-panel" id="turnCard"></section>
+
+            <section class="dock-section control-panel">
+              <div class="dice-row" id="diceRow"></div>
+              <div class="action-buttons">
+                <button class="primary-button" id="rollButton" type="button">Roll Dice</button>
+                <button class="secondary-button item-btn" id="itemButton" type="button">🎒 Item</button>
+                <button class="secondary-button" id="buyButton" type="button">Buy</button>
+                <button class="secondary-button" id="upgradeButton" type="button">Upgrade</button>
+                <button class="secondary-button" id="endTurnButton" type="button">End Turn</button>
+              </div>
+              <p class="hint-copy" id="hintText">
+                Pick 2 to 6 players, then launch the tabletop board.
+              </p>
+            </section>
+
+          </section>
+        </aside>
+
+      </main>
+    </div>
+
+    <!-- ── MODE SELECTION ── -->
+    <div class="overlay" id="modeOverlay">
+      <div class="mode-shell">
+        <header class="setup-hero bm-mode-hero">
+          <div class="bm-logo-block">
+            <span class="bm-bull">🐂</span>
+            <span class="bm-logo-text">BulloMarble</span>
+          </div>
+          <p class="bm-tagline">Bull (rising market) × Marble (the globe) — Travel the world and build your economic empire</p>
+          <h2 class="setup-title bm-mode-label">Select Game Mode</h2>
+          <p class="setup-hero-desc">Local Play for same-room friends, or Online Play to connect from anywhere in the world.</p>
+        </header>
+        <div class="mode-cards">
+          <button class="mode-card" id="modeSingleBtn" type="button">
+            <span class="mode-card-icon">🖥️</span>
+            <strong class="mode-card-title">Local Play</strong>
+            <span class="mode-card-desc">2–6 players take turns on the same device</span>
+          </button>
+          <button class="mode-card" id="modeNetworkBtn" type="button">
+            <span class="mode-card-icon">🌐</span>
+            <strong class="mode-card-title">Online Play</strong>
+            <span class="mode-card-desc">Play with friends anywhere — each on their own device</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="setupOverlay">
+      <div class="setup-shell">
+
+        <!-- 1. Hero: Title & Description -->
+        <header class="setup-hero">
+          <p class="eyebrow">BulloMarble · Local Play</p>
+          <h2 class="setup-title">Build The Richest Global Landmark Portfolio</h2>
+          <p class="setup-hero-desc">Roll around a square 40-space board with 10 spaces on each side, hit START, TAX, FREE PARKING, and WORLD EVENT, then climb from parks and small attractions to famous landmarks and finally skyscrapers plus mega landmarks.</p>
+        </header>
+
+        <form class="setup-form" id="setupForm">
+
+          <!-- Hidden select kept for JS compatibility -->
+          <select id="playerCountSelect" name="playerCount" class="hidden">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+
+          <!-- 2-1: Player Count -->
+          <div class="setup-section">
+            <p class="setup-section-label">Players</p>
+            <div class="player-count-radios" id="playerCountRadios">
+              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="2"><span>2 Player</span></label>
+              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="3"><span>3 Player</span></label>
+              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="4" checked><span>4 Player</span></label>
+              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="5"><span>5 Player</span></label>
+              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="6"><span>6 Player</span></label>
+            </div>
+          </div>
+
+          <!-- 2-2: Player Names & Colors -->
+          <div class="setup-section">
+            <div class="name-grid" id="playerFields"></div>
+          </div>
+
+          <!-- 2-3: Instructions -->
+          <div class="setup-section setup-notes">
+            <span>🖥 Hot-seat play on one device</span>
+            <span>🔄 Corner route: START → TAX → FREE PARKING → WORLD EVENT</span>
+            <span>📈 Board flow: early attractions → mid landmarks → late skyline giants</span>
+            <span>🏆 20-round summit or 4 Global Landmarks triggers the final audit</span>
+            <span>💰 Ranking = cash + landmark value + upgrade value</span>
+          </div>
+
+          <!-- 2-4: Launch -->
+          <button class="primary-button launch-button" type="submit">Launch Game</button>
+
+        </form>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="winnerOverlay">
+      <div class="overlay-card winner-card" id="winnerCard"></div>
+    </div>
+
+    <!-- ── NETWORK LOBBY ── -->
+    <div class="overlay hidden" id="lobbyOverlay">
+      <div class="lobby-shell" id="lobbyCard"></div>
+    </div>
+
+    <div class="overlay hidden" id="itemModal">
+      <div class="item-modal-card" id="itemModalCard"></div>
+    </div>
+  </body>
+</html>

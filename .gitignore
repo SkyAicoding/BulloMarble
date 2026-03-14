@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.log
+.DS_Store
+tmp/
+output/
+generated-images/
+.claude/
+package-lock.json
+scripts/
+progress.md
+ART_DIRECTION.md
