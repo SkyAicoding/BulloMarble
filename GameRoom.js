@@ -155,13 +155,14 @@ const SPACE_DEFS      = buildSpaceDefs();
 
 // ── GameRoom class ─────────────────────────────────────────────────────────
 export class GameRoom {
-  constructor(code, { roomName = "", maxPlayers = 4, isPublic = true, password = "", turnTimerSeconds = 0 } = {}) {
+  constructor(code, { roomName = "", maxPlayers = 4, isPublic = true, password = "", turnTimerSeconds = 0, roundLimit = 20 } = {}) {
     this.code             = code;
     this.roomName         = roomName || "";
     this.maxPlayers       = Math.min(Math.max(Number(maxPlayers) || 4, 2), 6);
     this.isPublic         = Boolean(isPublic);
     this.password         = password || "";
     this.turnTimerSeconds = Number(turnTimerSeconds) || 0;
+    this.roundLimit       = Math.min(Math.max(Number(roundLimit) || 20, 10), 50);
     this.players          = [];   // { socketId, name, colorIndex, isHost }
     this.started          = false;
     this.state            = null;
@@ -375,7 +376,7 @@ export class GameRoom {
       st.shopStock          = this._generateShopStock();
       if (wrapped) st.round += 1;
 
-      if (st.round > ROUND_LIMIT) {
+      if (st.round > this.roundLimit) {
         this._endGame("round-limit");
       } else {
         this._addLog(`${this._currentPlayer().name} is now at the table.`);

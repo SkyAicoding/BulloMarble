@@ -916,12 +916,16 @@ button {
 }
 
 .event-plaza {
-  align-items: center;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0.15rem 0 0;
 }
 
 .event-core {
-  width: 58%;
+  width: 46%;
   aspect-ratio: 1;
+  max-width: clamp(28px, 2.6vw, 48px);
+  max-height: clamp(28px, 2.6vw, 48px);
   display: grid;
   place-items: center;
   gap: 0.16rem;
@@ -934,7 +938,7 @@ button {
 }
 
 .event-glyph {
-  font-size: clamp(0.9rem, 1.1vw, 1.3rem);
+  font-size: clamp(0.8rem, 1vw, 1.2rem);
   color: rgba(255, 255, 255, 0.88);
 }
 
@@ -2437,6 +2441,45 @@ button {
   margin: 0 0 0.6rem;
 }
 
+/* 2-1: Players + Rounds inline row */
+.setup-row-inline {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+.setup-row-inline .setup-section {
+  flex: 1 1 auto;
+}
+.setup-section-rounds {
+  flex: 0 0 auto !important;
+  min-width: 130px;
+}
+.round-limit-select {
+  width: 100%;
+  background: rgba(6, 18, 28, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text-main);
+  font-size: 0.72rem;
+  font-family: inherit;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23efc77b'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  padding-right: 2rem;
+}
+.round-limit-select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(239,199,123,0.2);
+}
+.round-limit-select option {
+  background: #0a1e2e;
+  color: var(--text-main);
+}
+
 /* 2-1: Player Count Radio Pills */
 .player-count-radios {
   display: flex;
@@ -3445,6 +3488,11 @@ button {
   gap: 0.75rem;
   align-items: center;
 }
+.lobby-row-inline {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
 
 .lobby-row .primary-button,
 .lobby-row .secondary-button {
@@ -3913,6 +3961,57 @@ button {
   pointer-events: none;
 }
 .fireworks-canvas.hidden { display: none; }
+
+/* ── Custom confirm modal ───────────────────────────────────────────── */
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 8, 13, 0.72);
+  backdrop-filter: blur(8px);
+  animation: cfFadeIn 0.18s ease;
+}
+.confirm-modal.hidden { display: none; }
+@keyframes cfFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.confirm-modal-card {
+  background: rgba(7, 19, 30, 0.97);
+  border: 1.5px solid rgba(239, 199, 123, 0.4);
+  border-radius: 20px;
+  padding: 2rem 2.4rem 1.8rem;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow:
+    0 0 50px rgba(239, 199, 123, 0.18),
+    0 12px 40px rgba(0, 0, 0, 0.6);
+  animation: cfSlideIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes cfSlideIn {
+  from { transform: scale(0.88) translateY(-16px); opacity: 0; }
+  to   { transform: scale(1)    translateY(0);     opacity: 1; }
+}
+.confirm-modal-icon {
+  font-size: 2rem;
+  margin-bottom: 0.8rem;
+  filter: drop-shadow(0 0 10px rgba(239, 199, 123, 0.5));
+}
+.confirm-modal-message {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.65;
+  margin: 0 0 1.6rem;
+}
+.confirm-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
 
 /* ── Lobby: turn timer option row ───────────────────────────────────── */
 .lobby-timer-opts {

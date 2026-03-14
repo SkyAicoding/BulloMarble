@@ -4,6 +4,7 @@ const STARTING_CASH = 1500;
 const PASS_START_BONUS = 200;
 const EXACT_START_BONUS = 150;
 const ROUND_LIMIT = 20;
+let activeRoundLimit = Math.min(Math.max(Number(localStorage.getItem("bgame_roundLimit")) || ROUND_LIMIT, 10), 50);
 const MAX_UPGRADE_LEVEL = 3;
 const MAJOR_VICTORY_GLOBALS = 4;
 const MOVE_STEP_MS = 120;
@@ -388,6 +389,30 @@ const virtualClock = {
 validateBoardLayout();
 initialize();
 
+// ── Custom confirm modal ───────────────────────────────────────────────────
+function showConfirm(message, onYes) {
+  const modal  = document.getElementById("confirmModal");
+  const msgEl  = document.getElementById("confirmModalMessage");
+  const yesBtn = document.getElementById("confirmModalYes");
+  const noBtn  = document.getElementById("confirmModalNo");
+  if (!modal) { onYes?.(); return; }
+  msgEl.textContent = message;
+  modal.classList.remove("hidden");
+  const close = () => modal.classList.add("hidden");
+  yesBtn.onclick = () => { close(); onYes?.(); };
+  noBtn.onclick  = () => { close(); };
+}
+
+// ── Hide all in-game overlays (turn/round announce) ───────────────────────
+function clearAnnounceOverlays() {
+  const ta = document.getElementById("turnAnnounce");
+  const ra = document.getElementById("roundAnnounce");
+  if (ta) ta.classList.add("hidden");
+  if (ra) ra.classList.add("hidden");
+  if (_announceTimer)      { clearTimeout(_announceTimer);      _announceTimer = null; }
+  if (_roundAnnounceTimer) { clearTimeout(_roundAnnounceTimer); _roundAnnounceTimer = null; }
+}
+
 function initialize() {
   ui.board.style.setProperty("--board-size", String(BOARD_SIZE));
   renderPlayerFields(Number(ui.playerCountSelect.value));
@@ -400,6 +425,12 @@ function initialize() {
       ui.playerCountSelect.dispatchEvent(new Event("change"));
     });
   });
+  // Restore saved round limit selection
+  const savedRoundLimit = localStorage.getItem("bgame_roundLimit");
+  if (savedRoundLimit) {
+    const sel = document.getElementById("roundLimitSelect");
+    if (sel) sel.value = savedRoundLimit;
+  }
   ui.setupForm.addEventListener("submit", handleSetupSubmit);
   ui.rollButton.addEventListener("click", handleRoll);
   ui.buyButton.addEventListener("click", handleBuyAction);
@@ -411,24 +442,42 @@ function initialize() {
   }
   if (ui.homeButton) {
     ui.homeButton.addEventListener("click", () => {
-      if (gameMode === "network") {
-        ui.lobbyOverlay.classList.remove("hidden");
-        renderLobby("home");
+      const doNav = () => {
+        stopTurnTimer();
+        clearAnnounceOverlays();
+        if (gameMode === "network") {
+          ui.lobbyOverlay.classList.remove("hidden");
+          renderLobby("home");
+        } else {
+          ui.setupOverlay.classList.add("hidden");
+          ui.modeOverlay.classList.remove("hidden");
+        }
+      };
+      if (!state.players.length || state.gameOver) {
+        doNav();
       } else {
-        ui.setupOverlay.classList.remove("hidden");
+        showConfirm("End the current game and return to Select Game Mode?", doNav);
       }
     });
   }
   if (ui.stopGameButton) {
     ui.stopGameButton.addEventListener("click", () => {
-      if (!state.players.length || state.gameOver || confirm("End the current game and return to setup?")) {
+      const doEnd = () => {
+        stopTurnTimer();
+        clearAnnounceOverlays();
         ui.winnerOverlay.classList.add("hidden");
         if (gameMode === "network") {
           ui.lobbyOverlay.classList.remove("hidden");
           renderLobby("home");
         } else {
           ui.setupOverlay.classList.remove("hidden");
+          ui.modeOverlay.classList.add("hidden");
         }
+      };
+      if (!state.players.length || state.gameOver) {
+        doEnd();
+      } else {
+        showConfirm("End the current game and return to Local Play setup?", doEnd);
       }
     });
   }
@@ -676,6 +725,9 @@ function handleSetupSubmit(event) {
 
   const turnTimerSeconds = Number(document.querySelector('input[name="uiTurnTimer"]:checked')?.value ?? 0);
   const aiFlags = rows.map(row => row.dataset.isAi === "1");
+  const newRoundLimit = Number(document.getElementById("roundLimitSelect")?.value) || ROUND_LIMIT;
+  activeRoundLimit = newRoundLimit;
+  localStorage.setItem("bgame_roundLimit", newRoundLimit);
   startGame(names, colorIndices, turnTimerSeconds, aiFlags);
 }
 
@@ -748,14 +800,14 @@ function render() {
 }
 
 function renderTopBar() {
-  ui.roundLabel.textContent = `${Math.min(state.round, ROUND_LIMIT)} / ${ROUND_LIMIT}`;
+  ui.roundLabel.textContent = `${Math.min(state.round, activeRoundLimit)} / ${activeRoundLimit}`;
   ui.eventLabel.textContent = getTopbarEventText();
   ui.muteToggle.textContent = state.soundEnabled ? "Sound On" : "Sound Off";
 }
 
 function getTopbarEventText() {
   if (!state.log.length) {
-    return `Collect ${MAJOR_VICTORY_GLOBALS} Global Landmarks or survive ${ROUND_LIMIT} rounds.`;
+    return `Collect ${MAJOR_VICTORY_GLOBALS} Global Landmarks or survive ${activeRoundLimit} rounds.`;
   }
 
   return shortenText(state.log[0], 78);
@@ -832,8 +884,8 @@ function renderLandmarkTile(index, landmark, owner) {
 function renderEventTile(index, space) {
   return `
     <div class="space-topline">
-      <span></span>
       <span class="space-chip neutral">${space.badge}</span>
+      <span></span>
     </div>
     <div class="space-plaza event-plaza">
       <div class="event-core">
@@ -2162,7 +2214,7 @@ function handleEndTurn() {
       state.round += 1;
     }
 
-    if (state.round > ROUND_LIMIT) {
+    if (state.round > activeRoundLimit) {
       endGame("round-limit");
     } else {
       addLog(`${currentPlayer().name} is now at the table.`);
@@ -2252,14 +2304,9 @@ function endGame(reason) {
 
   addLog(`${state.winner?.name ?? "No one"} finished on top after the final asset audit.`);
   render();
-
-  if (state.winner) {
-    playSound("win");
-    showFireworks(3800);
-    setTimeout(() => renderWinnerOverlay(), 4000);
-  } else {
-    renderWinnerOverlay();
-  }
+  stopTurnTimer();
+  playSound("win");
+  showFireworks(3800, () => renderWinnerOverlay());
 }
 
 function renderWinnerOverlay() {
@@ -2288,22 +2335,43 @@ function renderWinnerOverlay() {
     <p class="winner-summary">Final ranking uses total assets only: cash + landmark value + upgrade value.</p>
     <div class="winner-actions">
       <button class="primary-button" id="playAgainButton" type="button">Play Again</button>
-      <button class="secondary-button" id="closeWinnerButton" type="button">Review Board</button>
+      <button class="secondary-button" id="prevMenuButton" type="button">이전 메뉴</button>
+      <button class="secondary-button" id="homeScreenButton" type="button">첫 화면</button>
     </div>
   `;
 
+  // Play Again → same menu as before (setup for local, lobby for network)
   ui.winnerCard.querySelector("#playAgainButton").addEventListener("click", () => {
     ui.winnerOverlay.classList.add("hidden");
     if (gameMode === "network") {
       ui.lobbyOverlay.classList.remove("hidden");
       renderLobby("home");
     } else {
-      ui.modeOverlay.classList.remove("hidden");
+      ui.setupOverlay.classList.remove("hidden");
+      ui.modeOverlay.classList.add("hidden");
     }
   });
-  ui.winnerCard.querySelector("#closeWinnerButton").addEventListener("click", () => {
+
+  // 이전 메뉴 → setup screen (local) or lobby (network)
+  ui.winnerCard.querySelector("#prevMenuButton").addEventListener("click", () => {
     ui.winnerOverlay.classList.add("hidden");
+    if (gameMode === "network") {
+      ui.lobbyOverlay.classList.remove("hidden");
+      renderLobby("home");
+    } else {
+      ui.setupOverlay.classList.remove("hidden");
+      ui.modeOverlay.classList.add("hidden");
+    }
   });
+
+  // 첫 화면 → mode select screen
+  ui.winnerCard.querySelector("#homeScreenButton").addEventListener("click", () => {
+    ui.winnerOverlay.classList.add("hidden");
+    ui.setupOverlay.classList.add("hidden");
+    ui.lobbyOverlay.classList.add("hidden");
+    ui.modeOverlay.classList.remove("hidden");
+  });
+
   ui.winnerOverlay.classList.remove("hidden");
 }
 
@@ -2324,7 +2392,7 @@ function renderRankingRow(player, index) {
 
 function getWinnerSummary(reason) {
   if (reason === "round-limit") {
-    return `The ${ROUND_LIMIT}-round summit ended. Rankings were settled by total assets.`;
+    return `The ${activeRoundLimit}-round summit ended. Rankings were settled by total assets.`;
   }
   if (reason === "last-investor") {
     return "Only one investor remained solvent. Rankings were still checked by total assets.";
@@ -2618,25 +2686,41 @@ function showRoundAnnounce(round) {
 }
 
 // ── Fireworks ceremony ─────────────────────────────────────────────────────
-function showFireworks(duration = 3600) {
+function showFireworks(duration = 3600, onComplete) {
   const canvas = document.getElementById("fireworksCanvas");
   if (!canvas) return;
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
   canvas.classList.remove("hidden");
+  canvas.style.display = "block";
 
   const ctx2 = canvas.getContext("2d");
   const particles = [];
   const COLORS = ["#ff6b6b","#ffd93d","#6bcb77","#4d96ff","#f72585","#ffbe0b","#fb5607","#2ec4b6","#c77dff"];
   let startTs  = null;
   let lastBurst = 0;
-  let burstCount = 0;
+  let done = false;
+
+  function finish() {
+    if (done) return;
+    done = true;
+    document.removeEventListener("keydown", skipHandler);
+    document.removeEventListener("pointerdown", skipHandler);
+    canvas.classList.add("hidden");
+    canvas.style.display = "";
+    ctx2.clearRect(0, 0, canvas.width, canvas.height);
+    if (onComplete) onComplete();
+  }
+
+  function skipHandler() { finish(); }
+  document.addEventListener("keydown", skipHandler);
+  document.addEventListener("pointerdown", skipHandler);
 
   function burst() {
     const x = canvas.width  * (0.2 + Math.random() * 0.6);
     const y = canvas.height * (0.15 + Math.random() * 0.55);
     const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-    const count = 48 + Math.floor(Math.random() * 24);
+    const count = 96 + Math.floor(Math.random() * 48); // 2x more particles
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
       const speed = 2.5 + Math.random() * 4.5;
@@ -2651,10 +2735,10 @@ function showFireworks(duration = 3600) {
       });
     }
     playSound("firework");
-    burstCount++;
   }
 
   function frame(ts) {
+    if (done) return;
     if (!startTs) startTs = ts;
     const elapsed = ts - startTs;
 
@@ -2669,17 +2753,17 @@ function showFireworks(duration = 3600) {
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.trail.push({ x: p.x, y: p.y });
-      if (p.trail.length > 5) p.trail.shift();
+      if (p.trail.length > 15) p.trail.shift(); // 3x longer trail
       p.x  += p.vx;
       p.y  += p.vy;
       p.vy += 0.09; // gravity
       p.vx *= 0.98; // drag
-      p.alpha -= 0.016;
+      p.alpha -= 0.010; // slower fade to show full trail
       if (p.alpha <= 0) { particles.splice(i, 1); continue; }
 
       // Draw trail
       for (let t = 0; t < p.trail.length - 1; t++) {
-        const a = (t / p.trail.length) * p.alpha * 0.45;
+        const a = (t / p.trail.length) * p.alpha * 0.55;
         ctx2.beginPath();
         ctx2.globalAlpha = a;
         ctx2.strokeStyle = p.color;
@@ -2700,8 +2784,7 @@ function showFireworks(duration = 3600) {
     if (elapsed < duration || particles.length > 0) {
       requestAnimationFrame(frame);
     } else {
-      canvas.classList.add("hidden");
-      ctx2.clearRect(0, 0, canvas.width, canvas.height);
+      finish();
     }
   }
   requestAnimationFrame(frame);
@@ -2833,7 +2916,7 @@ function renderGameToText() {
         mid: "famous landmarks",
         late: "skyscrapers and mega landmarks",
       },
-      round: `${Math.min(state.round, ROUND_LIMIT)}/${ROUND_LIMIT}`,
+      round: `${Math.min(state.round, activeRoundLimit)}/${activeRoundLimit}`,
       majorTrigger: `${MAJOR_VICTORY_GLOBALS} Global Landmarks`,
     },
     turn: player
@@ -2989,11 +3072,15 @@ function openItemModal(tab = "shop") {
   state.itemModalTab = tab;
   renderItemModal();
   ui.itemModal.classList.remove("hidden");
+  // Hide turn countdown so it doesn't overlap the modal
+  document.getElementById("turnCountdown")?.classList.add("hidden");
 }
 
 function closeItemModal() {
   ui.itemModal.classList.add("hidden");
   document.getElementById("item-target-step")?.remove();
+  // Restore countdown if timer is still running
+  if (_cdInterval) document.getElementById("turnCountdown")?.classList.remove("hidden");
 }
 
 function renderItemModal() {
@@ -3479,6 +3566,7 @@ const lobbyState = {
   suggestedRoomName:  "",
   turnTimerEnabled:   false,
   turnTimerSeconds:   60,
+  roundLimit:         Math.min(Math.max(Number(localStorage.getItem("bgame_roundLimit")) || 20, 10), 50),
 };
 
 function _lobbyColorSwatches(selectedIndex, takenSet = new Set()) {
@@ -3553,7 +3641,7 @@ function renderLobby(screen) {
           </span>
         </button>
       </div>
-      <button class="secondary-button" style="margin-top:1rem;" onclick="lobbyExit()">← Mode Select</button>
+      <button class="secondary-button" style="margin-top:1rem;" onclick="lobbyExit()">← Game Mode Select</button>
     `;
     return;
   }
@@ -3577,8 +3665,18 @@ function renderLobby(screen) {
           maxlength="24" placeholder="${lobbyState.suggestedRoomName}" autocomplete="off"
           value="${lobbyState.suggestedRoomName}" />
 
-        <label class="lobby-label" style="margin-top:0.9rem;">Max Players</label>
-        <div class="lobby-radio-group">${maxOpts}</div>
+        <div class="lobby-row-inline" style="margin-top:0.9rem; gap:1.2rem; align-items:flex-end;">
+          <div style="flex:1 1 auto;">
+            <label class="lobby-label">Max Players</label>
+            <div class="lobby-radio-group">${maxOpts}</div>
+          </div>
+          <div style="flex:0 0 auto; min-width:120px;">
+            <label class="lobby-label">Rounds</label>
+            <select class="round-limit-select" onchange="lobbySetRoundLimit(Number(this.value))">
+              ${[10,15,20,25,30,35,40,45,50].map(n => `<option value="${n}" ${lobbyState.roundLimit === n ? "selected" : ""}>${n} Rounds</option>`).join("")}
+            </select>
+          </div>
+        </div>
 
         <label class="lobby-label" style="margin-top:0.9rem;">Visibility</label>
         <div class="lobby-toggle-row">
@@ -3822,6 +3920,12 @@ function lobbySetTurnTimerSeconds(s) {
   lobbyState.turnTimerSeconds = s;
 }
 
+function lobbySetRoundLimit(n) {
+  lobbyState.roundLimit = n;
+  localStorage.setItem("bgame_roundLimit", n);
+  activeRoundLimit = n;
+}
+
 function lobbyShowCreate() {
   const nameEl = document.getElementById("lobbyPlayerName");
   if (nameEl) {
@@ -3965,6 +4069,10 @@ function attachSocketHandlers(socket) {
 
   // ── Game events ──────────────────────────────────
   socket.on("game_started", (serverState) => {
+    if (serverState.roundLimit) {
+      activeRoundLimit = serverState.roundLimit;
+      localStorage.setItem("bgame_roundLimit", serverState.roundLimit);
+    }
     applyServerState(serverState);
     ui.lobbyOverlay.classList.add("hidden");
     ui.winnerOverlay.classList.add("hidden");
@@ -3987,8 +4095,7 @@ function attachSocketHandlers(socket) {
     applyServerState(serverState);
     if (serverState.gameOver) {
       stopTurnTimer();
-      showFireworks(3800);
-      setTimeout(() => renderWinnerOverlay(), 4000);
+      showFireworks(3800, () => renderWinnerOverlay());
     } else if (serverState.currentPlayerIndex !== undefined && serverState.currentPlayerIndex !== prevIdx) {
       const newPlayer  = state.players[serverState.currentPlayerIndex];
       const roundBumped = state.round > prevRound;
@@ -4056,6 +4163,7 @@ function lobbyConfirmCreate() {
     isPublic:        lobbyState.isPublic,
     password:        "",
     turnTimerSeconds: lobbyState.turnTimerEnabled ? lobbyState.turnTimerSeconds : 0,
+    roundLimit:      lobbyState.roundLimit,
   });
 }
 
@@ -4103,6 +4211,7 @@ window.lobbySetMaxPlayers    = lobbySetMaxPlayers;
 window.lobbySetPublic        = lobbySetPublic;
 window.lobbySetTurnTimer     = lobbySetTurnTimer;
 window.lobbySetTurnTimerSeconds = lobbySetTurnTimerSeconds;
+window.lobbySetRoundLimit    = lobbySetRoundLimit;
 window.lobbyShowCreate       = lobbyShowCreate;
 window.lobbyShowBrowse       = lobbyShowBrowse;
 window.lobbyRefreshBrowse    = lobbyRefreshBrowse;

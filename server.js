@@ -75,11 +75,11 @@ io.on("connection", (socket) => {
   });
 
   // ── Lobby: create room ────────────────────────────────────────
-  socket.on("create_room", ({ name, colorIndex, roomName, maxPlayers, isPublic, password, turnTimerSeconds }) => {
+  socket.on("create_room", ({ name, colorIndex, roomName, maxPlayers, isPublic, password, turnTimerSeconds, roundLimit }) => {
     let code;
     do { code = generateRoomCode(); } while (rooms.has(code));
 
-    const room = new GameRoom(code, { roomName, maxPlayers, isPublic, password, turnTimerSeconds });
+    const room = new GameRoom(code, { roomName, maxPlayers, isPublic, password, turnTimerSeconds, roundLimit });
     room.addPlayer({ socketId: socket.id, name, colorIndex: colorIndex ?? 0, isHost: true });
     rooms.set(code, room);
     socket.join(code);
@@ -162,6 +162,7 @@ io.on("connection", (socket) => {
 
     const gameState = room.startGame();
     gameState.turnTimerSeconds = room.turnTimerSeconds || 0;
+    gameState.roundLimit       = room.roundLimit || 20;
     console.log(`[game] started in ${code} with ${room.players.length} players`);
     io.to(code).emit("game_started", gameState);
     broadcastRoomList(); // room disappears from list once started

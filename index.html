@@ -33,8 +33,8 @@
           </div>
 
           <nav class="sidebar-menu">
-            <button class="menu-btn" id="homeButton" type="button">⌂ Setup</button>
-            <button class="menu-btn" id="stopGameButton" type="button">✕ End Game</button>
+            <button class="menu-btn" id="homeButton" type="button">⌂ Game Mode Select</button>
+            <button class="menu-btn" id="stopGameButton" type="button">← End Game</button>
           </nav>
 
           <div class="players-panel" id="playersStrip"></div>
@@ -132,15 +132,31 @@
             <option value="6">6</option>
           </select>
 
-          <!-- 2-1: Player Count -->
-          <div class="setup-section">
-            <p class="setup-section-label">Players</p>
-            <div class="player-count-radios" id="playerCountRadios">
-              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="2"><span>2 Player</span></label>
-              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="3"><span>3 Player</span></label>
-              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="4" checked><span>4 Player</span></label>
-              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="5"><span>5 Player</span></label>
-              <label class="count-radio"><input type="radio" name="uiPlayerCount" value="6"><span>6 Player</span></label>
+          <!-- 2-1: Player Count + Round Limit -->
+          <div class="setup-row-inline">
+            <div class="setup-section">
+              <p class="setup-section-label">Players</p>
+              <div class="player-count-radios" id="playerCountRadios">
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="2"><span>2 Player</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="3"><span>3 Player</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="4" checked><span>4 Player</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="5"><span>5 Player</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="6"><span>6 Player</span></label>
+              </div>
+            </div>
+            <div class="setup-section setup-section-rounds">
+              <p class="setup-section-label">Rounds</p>
+              <select id="roundLimitSelect" class="round-limit-select">
+                <option value="10">10 Rounds</option>
+                <option value="15">15 Rounds</option>
+                <option value="20" selected>20 Rounds</option>
+                <option value="25">25 Rounds</option>
+                <option value="30">30 Rounds</option>
+                <option value="35">35 Rounds</option>
+                <option value="40">40 Rounds</option>
+                <option value="45">45 Rounds</option>
+                <option value="50">50 Rounds</option>
+              </select>
             </div>
           </div>
 
@@ -165,13 +181,13 @@
             <span>🖥 Hot-seat play on one device</span>
             <span>🔄 Corner route: START → TAX → FREE PARKING → WORLD EVENT</span>
             <span>📈 Board flow: early attractions → mid landmarks → late skyline giants</span>
-            <span>🏆 20-round summit or 4 Global Landmarks triggers the final audit</span>
+            <span>🏆 Selected-round summit or 4 Global Landmarks triggers the final audit</span>
             <span>💰 Ranking = cash + landmark value + upgrade value</span>
           </div>
 
           <!-- 2-5: Launch -->
           <div class="setup-launch-row">
-            <button type="button" class="secondary-button" onclick="backToModeSelect()">← Mode Select</button>
+            <button type="button" class="secondary-button" onclick="backToModeSelect()">← Game Mode Select</button>
             <button class="primary-button launch-button" type="submit">Launch Game</button>
           </div>
 
@@ -195,5 +211,17 @@
     <div id="turnCountdown" class="turn-countdown hidden"></div>
     <div id="roundAnnounce" class="round-announce hidden"></div>
     <canvas id="fireworksCanvas" class="fireworks-canvas hidden"></canvas>
+
+    <!-- Custom confirm modal -->
+    <div id="confirmModal" class="confirm-modal hidden">
+      <div class="confirm-modal-card">
+        <div class="confirm-modal-icon">⚠</div>
+        <p class="confirm-modal-message" id="confirmModalMessage"></p>
+        <div class="confirm-modal-actions">
+          <button class="primary-button" id="confirmModalYes" type="button">Yes, Exit</button>
+          <button class="secondary-button" id="confirmModalNo" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
