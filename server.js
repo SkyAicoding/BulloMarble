@@ -109,7 +109,15 @@ io.on("connection", (socket) => {
     if (!room.isPublic && room.password && room.password !== password)
       return socket.emit("lobby_error", { message: "Incorrect password." });
 
-    room.addPlayer({ socketId: socket.id, name, colorIndex: colorIndex ?? room.players.length, isHost: false });
+    // Auto-resolve color conflict: if requested color is taken, pick the first free one
+    const takenColors = new Set(room.players.map(p => p.colorIndex));
+    let resolvedColor = colorIndex ?? room.players.length;
+    if (takenColors.has(resolvedColor)) {
+      for (let i = 0; i < 6; i++) {
+        if (!takenColors.has(i)) { resolvedColor = i; break; }
+      }
+    }
+    room.addPlayer({ socketId: socket.id, name, colorIndex: resolvedColor, isHost: false });
     socket.join(code);
     socket.leave("__lobby__");
 
@@ -127,6 +135,22 @@ io.on("connection", (socket) => {
       isPublic:   room.isPublic,
     });
     broadcastRoomList();
+  });
+
+  // ── Lobby: change color ───────────────────────────────────────
+  socket.on("change_color", ({ code, colorIndex }) => {
+    const room = rooms.get(code);
+    if (!room || room.started) return;
+    const player = room.players.find(p => p.socketId === socket.id);
+    if (!player) return;
+    const taken = room.players.some(p => p.socketId !== socket.id && p.colorIndex === colorIndex);
+    if (taken) return socket.emit("lobby_error", { message: "Color already taken." });
+    player.colorIndex = colorIndex;
+    io.to(code).emit("room_updated", {
+      players:    room.players,
+      maxPlayers: room.maxPlayers,
+      roomName:   room.roomName || `${room.players[0]?.name ?? "?"}'s Room`,
+    });
   });
 
   // ── Lobby: start game (host only) ─────────────────────────────

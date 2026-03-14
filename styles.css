@@ -3489,6 +3489,14 @@ button {
   box-shadow: 0 0 0 3px rgba(255,255,255,0.18);
 }
 
+.lobby-color-swatch.taken,
+.lobby-color-swatch:disabled {
+  opacity: 0.22;
+  cursor: not-allowed;
+  transform: none !important;
+  pointer-events: none;
+}
+
 /* ── Lobby: vertical action buttons (home screen) ────── */
 .lobby-actions {
   display: flex;

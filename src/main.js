@@ -3130,11 +3130,27 @@ const lobbyState = {
   suggestedRoomName: "",
 };
 
-function _lobbyColorSwatches(selectedIndex) {
-  return LOBBY_COLORS.map((c, i) => `
-    <button class="lobby-color-swatch ${i === selectedIndex ? "selected" : ""}"
+function _lobbyColorSwatches(selectedIndex, takenSet = new Set()) {
+  return LOBBY_COLORS.map((c, i) => {
+    const isTaken = takenSet.has(i) && i !== selectedIndex;
+    return `
+    <button class="lobby-color-swatch ${i === selectedIndex ? "selected" : ""} ${isTaken ? "taken" : ""}"
       style="background:${c.color};" title="${c.label}"
-      onclick="lobbyPickColor(${i})"></button>`).join("");
+      ${isTaken ? "disabled" : ""}
+      onclick="lobbyPickColor(${i})"></button>`;
+  }).join("");
+}
+
+function _waitingColorSwatches(players, myColorIndex) {
+  const takenSet = new Set(players.filter(p => p.colorIndex !== myColorIndex).map(p => p.colorIndex));
+  return LOBBY_COLORS.map((c, i) => {
+    const isTaken = takenSet.has(i);
+    return `
+    <button class="lobby-color-swatch ${i === myColorIndex ? "selected" : ""} ${isTaken ? "taken" : ""}"
+      style="background:${c.color};" title="${c.label}"
+      ${isTaken ? "disabled" : ""}
+      onclick="lobbyWaitingChangeColor(${i})"></button>`;
+  }).join("");
 }
 
 function renderLobby(screen) {
@@ -3309,7 +3325,7 @@ function renderLobby(screen) {
   if (lobbyState.screen === "waiting-host") {
     const playerRows = lobbyState.players.map((p) => `
       <div class="lobby-player-row">
-        <span class="lobby-player-dot" style="background:${p.color ?? '#efc77b'};"></span>
+        <span class="lobby-player-dot" style="background:${LOBBY_COLORS[p.colorIndex]?.color ?? '#efc77b'};"></span>
         <span class="lobby-player-name">${p.name}</span>
         ${p.isHost ? `<span class="lobby-player-host-badge">HOST</span>` : ""}
       </div>`).join("");
@@ -3321,6 +3337,12 @@ function renderLobby(screen) {
       </div>
       <div class="lobby-room-code">${lobbyState.roomCode}</div>
       <p class="lobby-room-code-label">Share this code with other players</p>
+      <div class="lobby-color-row">
+        <label class="lobby-label">My Color</label>
+        <div class="lobby-color-swatches" id="waitingColorSwatches">
+          ${_waitingColorSwatches(lobbyState.players, lobbyState.colorIndex)}
+        </div>
+      </div>
       <div class="lobby-player-list">
         <p class="lobby-player-list-label">Players ${lobbyState.players.length} / ${lobbyState.maxPlayers}</p>
         ${playerRows}
@@ -3338,7 +3360,7 @@ function renderLobby(screen) {
   if (lobbyState.screen === "waiting-guest") {
     const playerRows = lobbyState.players.map((p) => `
       <div class="lobby-player-row">
-        <span class="lobby-player-dot" style="background:${p.color ?? '#efc77b'};"></span>
+        <span class="lobby-player-dot" style="background:${LOBBY_COLORS[p.colorIndex]?.color ?? '#efc77b'};"></span>
         <span class="lobby-player-name">${p.name}</span>
         ${p.isHost ? `<span class="lobby-player-host-badge">HOST</span>` : ""}
       </div>`).join("");
@@ -3349,6 +3371,12 @@ function renderLobby(screen) {
         <h2 class="lobby-title">Joined Room</h2>
       </div>
       <div class="lobby-room-code">${lobbyState.roomCode}</div>
+      <div class="lobby-color-row">
+        <label class="lobby-label">My Color</label>
+        <div class="lobby-color-swatches" id="waitingColorSwatches">
+          ${_waitingColorSwatches(lobbyState.players, lobbyState.colorIndex)}
+        </div>
+      </div>
       <div class="lobby-player-list">
         <p class="lobby-player-list-label">Players ${lobbyState.players.length} / ${lobbyState.maxPlayers}</p>
         ${playerRows}
@@ -3401,6 +3429,16 @@ function lobbyPickColor(index) {
   const container = document.getElementById("lobbyColorSwatches");
   if (container) {
     container.innerHTML = _lobbyColorSwatches(index);
+  }
+}
+
+function lobbyWaitingChangeColor(index) {
+  lobbyState.colorIndex = index;
+  networkSocket?.emit("change_color", { code: lobbyState.roomCode, colorIndex: index });
+  // Optimistically refresh swatches
+  const container = document.getElementById("waitingColorSwatches");
+  if (container) {
+    container.innerHTML = _waitingColorSwatches(lobbyState.players, index);
   }
 }
 
@@ -3515,6 +3553,8 @@ function attachSocketHandlers(socket) {
     lobbyState.players    = players;
     lobbyState.maxPlayers = maxPlayers ?? lobbyState.maxPlayers;
     lobbyState.isHost     = true;
+    const me = players.find(p => p.socketId === socket.id);
+    if (me) lobbyState.colorIndex = me.colorIndex;
     renderLobby("waiting-host");
   });
 
@@ -3523,12 +3563,16 @@ function attachSocketHandlers(socket) {
     lobbyState.players    = players;
     lobbyState.maxPlayers = maxPlayers ?? lobbyState.maxPlayers;
     lobbyState.isHost     = false;
+    const me = players.find(p => p.socketId === socket.id);
+    if (me) lobbyState.colorIndex = me.colorIndex;
     renderLobby("waiting-guest");
   });
 
   socket.on("room_updated", ({ players, maxPlayers }) => {
     lobbyState.players    = players;
     if (maxPlayers) lobbyState.maxPlayers = maxPlayers;
+    const me = players.find(p => p.socketId === socket.id);
+    if (me) lobbyState.colorIndex = me.colorIndex;
     renderLobby();
   });
 
