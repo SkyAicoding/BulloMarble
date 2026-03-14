@@ -3822,8 +3822,8 @@ button {
 
 .countdown-ring {
   position: relative;
-  width: 82px;
-  height: 82px;
+  width: 136px;
+  height: 136px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3836,11 +3836,11 @@ button {
   overflow: visible;
 }
 .countdown-number {
-  font-size: 1.85rem;
+  font-size: 2.7rem;
   font-weight: 900;
   position: relative;
   z-index: 1;
-  text-shadow: 0 0 12px currentColor;
+  text-shadow: 0 0 18px currentColor;
   line-height: 1;
 }
 .countdown-urgent .countdown-number {
@@ -3850,6 +3850,69 @@ button {
   0%, 100% { transform: scale(1);    }
   50%       { transform: scale(1.25); }
 }
+
+/* ── Round announce (gravity drop) ──────────────────────────────────── */
+.round-announce {
+  position: fixed;
+  z-index: 9200;
+  pointer-events: none;
+  /* left/top/transform set by JS to board-center */
+}
+.round-announce.hidden { display: none; }
+
+.round-announce-enter .round-announce-inner { animation: rdropIn 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.round-announce-exit  .round-announce-inner { animation: rdropOut 0.5s ease forwards; }
+
+@keyframes rdropIn {
+  0%   { opacity: 0;   transform: translateY(-200px) scale(0.7); }
+  55%  { opacity: 1;   transform: translateY(14px)   scale(1.04); }
+  72%  { transform: translateY(-5px)  scale(0.98); }
+  85%  { transform: translateY(3px)   scale(1.01); }
+  100% { opacity: 1;   transform: translateY(0)      scale(1); }
+}
+@keyframes rdropOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(20px) scale(0.88); }
+}
+
+.round-announce-inner {
+  position: relative;
+  text-align: center;
+  padding: 1.4rem 3rem;
+  background: rgba(7, 19, 30, 0.94);
+  border: 1.5px solid rgba(239, 199, 123, 0.6);
+  border-radius: 20px;
+  box-shadow:
+    0 0 40px rgba(239, 199, 123, 0.35),
+    0 0 90px rgba(239, 199, 123, 0.15);
+}
+.round-announce-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(239, 199, 123, 0.7);
+  margin-bottom: 0.2rem;
+}
+.round-announce-number {
+  display: block;
+  font-size: clamp(2.4rem, 6vw, 3.4rem);
+  font-weight: 900;
+  color: #efc77b;
+  text-shadow: 0 0 28px rgba(239, 199, 123, 0.7);
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+/* ── Fireworks canvas ───────────────────────────────────────────────── */
+.fireworks-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  pointer-events: none;
+}
+.fireworks-canvas.hidden { display: none; }
 
 /* ── Lobby: turn timer option row ───────────────────────────────────── */
 .lobby-timer-opts {

@@ -287,6 +287,31 @@ const SYNTH_SOUNDS = {
     _osc(ctx, 880,  "triangle", t+0.15, 0.2, 0.15);
     _noise(ctx, t, 0.25, 0.06, 600);
   },
+  round_start(ctx) {
+    const t = ctx.currentTime;
+    _noise(ctx, t, 0.12, 0.18, 900);
+    [392, 523, 659, 784, 1047].forEach((f, i) => _osc(ctx, f, "triangle", t + 0.05 + i*0.09, 0.38, 0.2));
+    _osc(ctx, 1568, "sine", t + 0.55, 0.5, 0.22);
+  },
+  firework(ctx) {
+    const t = ctx.currentTime;
+    // launch whistle
+    const osc = ctx.createOscillator();
+    const gn  = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.exponentialRampToValueAtTime(1600, t + 0.18);
+    gn.gain.setValueAtTime(0.25, t);
+    gn.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(gn); gn.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.22);
+    // explosion burst
+    _noise(ctx, t + 0.18, 0.35, 0.45, 1400);
+    _noise(ctx, t + 0.25, 0.28, 0.3,  800);
+    // sparkle tones
+    [523, 784, 1047, 1319, 1568].forEach((f, i) =>
+      _osc(ctx, f, "sine", t + 0.22 + i * 0.07, 0.4, 0.15));
+  },
 };
 
 const BOARD_POSITIONS = buildBoardPositions(BOARD_SIZE);
@@ -349,9 +374,10 @@ let gameMode      = "single"; // "single" | "network"
 let networkSocket = null;    // Socket.io socket (network mode only)
 
 // ── Turn announce + countdown ──────────────────────────────────────────────
-let _announceTimer  = null;
-let _cdInterval     = null;
-let _cdRemaining    = 0;
+let _announceTimer      = null;
+let _roundAnnounceTimer = null;
+let _cdInterval         = null;
+let _cdRemaining        = 0;
 
 // audioCache kept for API compatibility (no-op with synth sounds)
 const virtualClock = {
@@ -704,9 +730,10 @@ function startGame(names, colorIndices = [], turnTimerSeconds = 0, aiFlags = [])
   render();
   // Defer one frame so .board-center is laid out before positioning
   requestAnimationFrame(() => {
-    showTurnAnnounce(currentPlayer());
-    if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
-    if (currentPlayer()?.isAI) setTimeout(runAITurn, 1800);
+    showRoundAnnounce(1);
+    setTimeout(() => showTurnAnnounce(currentPlayer()), 2600);
+    if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 5000);
+    if (currentPlayer()?.isAI) setTimeout(runAITurn, 4400);
   });
 }
 
@@ -811,16 +838,11 @@ function renderEventTile(index, space) {
     <div class="space-plaza event-plaza">
       <div class="event-core">
         <span class="event-glyph">${space.icon}</span>
-        <span class="event-label">${space.badge}</span>
       </div>
       <div class="token-list">${renderTokensForSpace(index)}</div>
     </div>
     <div class="space-caption">
-      <p class="space-name">${space.title}</p>
-      <div class="space-finance-row">
-        <span class="space-value-pill event">${shortenText(space.subtitle, 20)}</span>
-        <span class="space-tier-tag neutral">${space.badge}</span>
-      </div>
+      <span class="space-value-pill event">${shortenText(space.subtitle, 20)}</span>
     </div>
   `;
 }
@@ -1362,16 +1384,16 @@ function renderSelectedSpace() {
           <p class="eyebrow event-eyebrow">${space.subtitle}</p>
           <h2 class="selected-title">${space.title}</h2>
         </div>
-        <span class="event-badge-pill">${space.badge}</span>
       </div>
       <div class="event-rule-block">
         <p class="event-block-label">Rule</p>
         <p class="event-rule-copy">${space.copy}</p>
       </div>
+      ${impact ? `
       <div class="event-impact-block">
         <p class="event-block-label">Current Impact</p>
         <p class="event-impact-value">${impact}</p>
-      </div>
+      </div>` : ""}
     </div>
   `;
 }
@@ -2145,11 +2167,16 @@ function handleEndTurn() {
     } else {
       addLog(`${currentPlayer().name} is now at the table.`);
       render();
-      showTurnAnnounce(currentPlayer());
-      if (state.turnTimerSeconds > 0) {
-        setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+      if (wrapped) {
+        showRoundAnnounce(state.round);
+        setTimeout(() => showTurnAnnounce(currentPlayer()), 2600);
+        if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 5000);
+        if (currentPlayer().isAI) setTimeout(runAITurn, 4400);
+      } else {
+        showTurnAnnounce(currentPlayer());
+        if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+        if (currentPlayer().isAI) setTimeout(runAITurn, 1800);
       }
-      if (currentPlayer().isAI) setTimeout(runAITurn, 1800);
     }
     return;
   }
@@ -2223,13 +2250,16 @@ function endGame(reason) {
   state.winnerReason = reason;
   state.winner = rankedPlayers()[0] ?? null;
 
-  if (state.winner) {
-    playSound("win");
-  }
-
-  renderWinnerOverlay();
   addLog(`${state.winner?.name ?? "No one"} finished on top after the final asset audit.`);
   render();
+
+  if (state.winner) {
+    playSound("win");
+    showFireworks(3800);
+    setTimeout(() => renderWinnerOverlay(), 4000);
+  } else {
+    renderWinnerOverlay();
+  }
 }
 
 function renderWinnerOverlay() {
@@ -2434,43 +2464,25 @@ function findNextOpenLandmarkIndex(currentIndex) {
 }
 
 function getEventPreview(space, player) {
-  if (!player) {
-    return "Start a game to see the current impact preview.";
-  }
+  if (!player) return null;
 
   switch (space.eventType) {
-    case "start":
-      return `Pass reward: $${formatMoney(PASS_START_BONUS)}. Landing reward: $${formatMoney(EXACT_START_BONUS)}.`;
-    case "corner-tax":
-      return "If landed now: pay a flat $150 city tax.";
     case "tourism-boom":
-      return `If landed now: +$${formatMoney(120 + ownedLandmarks(player.id).length * 25)}.`;
+      return `Now: +$${formatMoney(120 + ownedLandmarks(player.id).length * 25)}`;
     case "currency-shock":
-      return `If landed now: -$${formatMoney(90 + totalUpgradeCount(player.id) * 18)}.`;
-    case "skybridge-charter":
-      return "If landed now: move to the next landmark and resolve it instantly.";
+      return `Now: -$${formatMoney(90 + totalUpgradeCount(player.id) * 18)}`;
     case "heritage-grant":
-      return `If landed now: +$${formatMoney(80 + countDevelopedOrBetter(player.id) * 45)}.`;
+      return `Now: +$${formatMoney(80 + countDevelopedOrBetter(player.id) * 45)}`;
     case "zoning-audit":
-      return `If landed now: -$${formatMoney(110 + ownedLandmarks(player.id).length * 20)}.`;
-    case "continental-connector":
-      return "If landed now: jump to the next open landmark, or the next landmark if all are owned.";
+      return `Now: -$${formatMoney(110 + ownedLandmarks(player.id).length * 20)}`;
     case "media-spotlight":
-      return `If landed now: +$${formatMoney(100 + Math.round(highestOwnedRent(player.id) * 0.75))}.`;
-    case "customs-delay":
-      return "If landed now: your next turn is skipped.";
-    case "free-parking":
-      return "If landed now: collect a $50 parking rebate.";
+      return `Now: +$${formatMoney(100 + Math.round(highestOwnedRent(player.id) * 0.75))}`;
     case "market-summit":
-      return `If landed now: +$${formatMoney(140 + countGlobalLandmarks(player.id) * 80)}.`;
+      return `Now: +$${formatMoney(140 + countGlobalLandmarks(player.id) * 80)}`;
     case "restoration-bill":
-      return `If landed now: -$${formatMoney(70 + Math.round(getUpgradeAssetValue(player) * 0.15))}.`;
-    case "acquisition-flight":
-      return "If landed now: gain $60, then move to the next landmark and resolve it.";
-    case "world-event":
-      return "If landed now: random global swing, either bonus cash, a tax hit, or a jump to the next landmark.";
+      return `Now: -$${formatMoney(70 + Math.round(getUpgradeAssetValue(player) * 0.15))}`;
     default:
-      return space.copy;
+      return null;
   }
 }
 
@@ -2584,6 +2596,117 @@ function showTurnAnnounce(player) {
   }, 2100);
 }
 
+// ── Round announce (gravity drop) ─────────────────────────────────────────
+function showRoundAnnounce(round) {
+  const el = document.getElementById("roundAnnounce");
+  if (!el) return;
+  el.innerHTML = `
+    <div class="round-announce-inner">
+      <span class="round-announce-label">Round</span>
+      <span class="round-announce-number">${round}</span>
+    </div>`;
+  _positionOnBoard("roundAnnounce");
+  el.classList.remove("hidden", "round-announce-exit");
+  el.classList.add("round-announce-enter");
+  playSound("round_start");
+  if (_roundAnnounceTimer) clearTimeout(_roundAnnounceTimer);
+  _roundAnnounceTimer = setTimeout(() => {
+    el.classList.remove("round-announce-enter");
+    el.classList.add("round-announce-exit");
+    setTimeout(() => el.classList.add("hidden"), 520);
+  }, 2200);
+}
+
+// ── Fireworks ceremony ─────────────────────────────────────────────────────
+function showFireworks(duration = 3600) {
+  const canvas = document.getElementById("fireworksCanvas");
+  if (!canvas) return;
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.classList.remove("hidden");
+
+  const ctx2 = canvas.getContext("2d");
+  const particles = [];
+  const COLORS = ["#ff6b6b","#ffd93d","#6bcb77","#4d96ff","#f72585","#ffbe0b","#fb5607","#2ec4b6","#c77dff"];
+  let startTs  = null;
+  let lastBurst = 0;
+  let burstCount = 0;
+
+  function burst() {
+    const x = canvas.width  * (0.2 + Math.random() * 0.6);
+    const y = canvas.height * (0.15 + Math.random() * 0.55);
+    const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const count = 48 + Math.floor(Math.random() * 24);
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+      const speed = 2.5 + Math.random() * 4.5;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1.5,
+        alpha: 1,
+        color,
+        radius: 1.6 + Math.random() * 2.2,
+        trail: [],
+      });
+    }
+    playSound("firework");
+    burstCount++;
+  }
+
+  function frame(ts) {
+    if (!startTs) startTs = ts;
+    const elapsed = ts - startTs;
+
+    ctx2.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Burst every ~380ms for first 2.8s, then let particles fade
+    if (elapsed < 2800 && ts - lastBurst > 380) {
+      burst();
+      lastBurst = ts;
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > 5) p.trail.shift();
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.vy += 0.09; // gravity
+      p.vx *= 0.98; // drag
+      p.alpha -= 0.016;
+      if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+
+      // Draw trail
+      for (let t = 0; t < p.trail.length - 1; t++) {
+        const a = (t / p.trail.length) * p.alpha * 0.45;
+        ctx2.beginPath();
+        ctx2.globalAlpha = a;
+        ctx2.strokeStyle = p.color;
+        ctx2.lineWidth = p.radius * 0.7;
+        ctx2.moveTo(p.trail[t].x, p.trail[t].y);
+        ctx2.lineTo(p.trail[t + 1].x, p.trail[t + 1].y);
+        ctx2.stroke();
+      }
+      // Draw particle
+      ctx2.globalAlpha = p.alpha;
+      ctx2.fillStyle   = p.color;
+      ctx2.beginPath();
+      ctx2.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx2.fill();
+    }
+    ctx2.globalAlpha = 1;
+
+    if (elapsed < duration || particles.length > 0) {
+      requestAnimationFrame(frame);
+    } else {
+      canvas.classList.add("hidden");
+      ctx2.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
 function startTurnTimer(seconds) {
   stopTurnTimer();
   _cdRemaining = seconds;
@@ -2618,19 +2741,19 @@ function _renderCountdown() {
   const total = state.turnTimerSeconds || 60;
   const pct   = Math.max(0, _cdRemaining / total);
   const hue   = Math.round(pct * 120); // 120=green → 60=yellow → 0=red
-  const r     = 34;
+  const r     = 56;
   const circ  = 2 * Math.PI * r;
   const urgent = _cdRemaining <= 5;
   el.innerHTML = `
     <div class="countdown-ring${urgent ? " countdown-urgent" : ""}" style="--countdown-color:hsl(${hue},88%,58%);">
-      <svg viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="6"/>
-        <circle cx="40" cy="40" r="${r}" fill="none"
-          stroke="hsl(${hue},88%,58%)" stroke-width="6"
+      <svg viewBox="0 0 136 136">
+        <circle cx="68" cy="68" r="${r}" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="8"/>
+        <circle cx="68" cy="68" r="${r}" fill="none"
+          stroke="hsl(${hue},88%,58%)" stroke-width="8"
           stroke-dasharray="${circ.toFixed(2)}"
           stroke-dashoffset="${(circ * (1 - pct)).toFixed(2)}"
           stroke-linecap="round"
-          style="transform:rotate(-90deg);transform-origin:40px 40px;transition:stroke-dashoffset 0.92s linear,stroke 0.5s;"/>
+          style="transform:rotate(-90deg);transform-origin:68px 68px;transition:stroke-dashoffset 0.92s linear,stroke 0.5s;"/>
       </svg>
       <span class="countdown-number" style="color:hsl(${hue},88%,58%);">${_cdRemaining}</span>
     </div>`;
@@ -3848,26 +3971,42 @@ function attachSocketHandlers(socket) {
     primeAudio();
     render();
     const firstPlayer = state.players[0];
-    showTurnAnnounce(firstPlayer);
-    if (state.turnTimerSeconds > 0) {
-      const isMyTurn = firstPlayer?.socketId === socket.id;
-      if (isMyTurn) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
-    }
+    requestAnimationFrame(() => {
+      showRoundAnnounce(1);
+      setTimeout(() => showTurnAnnounce(firstPlayer), 2600);
+      if (state.turnTimerSeconds > 0) {
+        const isMyTurn = firstPlayer?.socketId === socket.id;
+        if (isMyTurn) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 5000);
+      }
+    });
   });
 
   socket.on("state_update", (serverState) => {
-    const prevIdx = state.currentPlayerIndex;
+    const prevIdx   = state.currentPlayerIndex;
+    const prevRound = state.round;
     applyServerState(serverState);
     if (serverState.gameOver) {
       stopTurnTimer();
-      renderWinnerOverlay();
+      showFireworks(3800);
+      setTimeout(() => renderWinnerOverlay(), 4000);
     } else if (serverState.currentPlayerIndex !== undefined && serverState.currentPlayerIndex !== prevIdx) {
-      const newPlayer = state.players[serverState.currentPlayerIndex];
-      showTurnAnnounce(newPlayer);
-      if (state.turnTimerSeconds > 0) {
-        const isMyTurn = newPlayer?.socketId === socket.id;
-        stopTurnTimer();
-        if (isMyTurn) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+      const newPlayer  = state.players[serverState.currentPlayerIndex];
+      const roundBumped = state.round > prevRound;
+      if (roundBumped) {
+        showRoundAnnounce(state.round);
+        setTimeout(() => showTurnAnnounce(newPlayer), 2600);
+        if (state.turnTimerSeconds > 0) {
+          const isMyTurn = newPlayer?.socketId === socket.id;
+          stopTurnTimer();
+          if (isMyTurn) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 5000);
+        }
+      } else {
+        showTurnAnnounce(newPlayer);
+        if (state.turnTimerSeconds > 0) {
+          const isMyTurn = newPlayer?.socketId === socket.id;
+          stopTurnTimer();
+          if (isMyTurn) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+        }
       }
     }
     render();
