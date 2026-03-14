@@ -3090,20 +3090,6 @@ window.closeItemModal = closeItemModal;
 
 // ── Network Lobby ─────────────────────────────────────────────────────────
 
-const lobbyState = {
-  screen:          "home",
-  roomCode:        "",
-  playerName:      localStorage.getItem("ll_playerName") || _randomPlayerName(),
-  colorIndex:      0,
-  players:         [],
-  isHost:          false,
-  errorMsg:        "",
-  browseRooms:     [],
-  maxPlayers:      4,
-  isPublic:          true,
-  suggestedRoomName: "",
-};
-
 // Color swatches available for lobby selection (first 6 from palette)
 const LOBBY_COLORS = COLOR_PALETTE.slice(0, 6);
 
@@ -3129,6 +3115,20 @@ const ROOM_NAME_POOL = [
 function _randomRoomName() {
   return ROOM_NAME_POOL[Math.floor(Math.random() * ROOM_NAME_POOL.length)];
 }
+
+const lobbyState = {
+  screen:          "home",
+  roomCode:        "",
+  playerName:      localStorage.getItem("ll_playerName") || _randomPlayerName(),
+  colorIndex:      0,
+  players:         [],
+  isHost:          false,
+  errorMsg:        "",
+  browseRooms:     [],
+  maxPlayers:      4,
+  isPublic:          true,
+  suggestedRoomName: "",
+};
 
 function _lobbyColorSwatches(selectedIndex) {
   return LOBBY_COLORS.map((c, i) => `
