@@ -158,6 +158,17 @@
             <span>💰 Ranking = cash + landmark value + upgrade value</span>
           </div>
 
+          <!-- 2-3b: Turn Timer -->
+          <div class="setup-section">
+            <p class="setup-section-label">Turn Timer</p>
+            <div class="player-count-radios" id="turnTimerRadios">
+              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="0" checked><span>Off</span></label>
+              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="30"><span>30s</span></label>
+              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="60"><span>60s</span></label>
+              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="90"><span>90s</span></label>
+            </div>
+          </div>
+
           <!-- 2-4: Launch -->
           <button class="primary-button launch-button" type="submit">Launch Game</button>
 
@@ -177,5 +188,7 @@
     <div class="overlay hidden" id="itemModal">
       <div class="item-modal-card" id="itemModalCard"></div>
     </div>
+    <div id="turnAnnounce" class="turn-announce hidden"></div>
+    <div id="turnCountdown" class="turn-countdown hidden"></div>
   </body>
 </html>

@@ -155,15 +155,16 @@ const SPACE_DEFS      = buildSpaceDefs();
 
 // ── GameRoom class ─────────────────────────────────────────────────────────
 export class GameRoom {
-  constructor(code, { roomName = "", maxPlayers = 4, isPublic = true, password = "" } = {}) {
-    this.code       = code;
-    this.roomName   = roomName || "";
-    this.maxPlayers = Math.min(Math.max(Number(maxPlayers) || 4, 2), 6);
-    this.isPublic   = Boolean(isPublic);
-    this.password   = password || "";
-    this.players    = [];   // { socketId, name, colorIndex, isHost }
-    this.started    = false;
-    this.state      = null;
+  constructor(code, { roomName = "", maxPlayers = 4, isPublic = true, password = "", turnTimerSeconds = 0 } = {}) {
+    this.code             = code;
+    this.roomName         = roomName || "";
+    this.maxPlayers       = Math.min(Math.max(Number(maxPlayers) || 4, 2), 6);
+    this.isPublic         = Boolean(isPublic);
+    this.password         = password || "";
+    this.turnTimerSeconds = Number(turnTimerSeconds) || 0;
+    this.players          = [];   // { socketId, name, colorIndex, isHost }
+    this.started          = false;
+    this.state            = null;
   }
 
   // ── Player management ────────────────────────────────────────────

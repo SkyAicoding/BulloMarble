@@ -75,11 +75,11 @@ io.on("connection", (socket) => {
   });
 
   // ── Lobby: create room ────────────────────────────────────────
-  socket.on("create_room", ({ name, colorIndex, roomName, maxPlayers, isPublic, password }) => {
+  socket.on("create_room", ({ name, colorIndex, roomName, maxPlayers, isPublic, password, turnTimerSeconds }) => {
     let code;
     do { code = generateRoomCode(); } while (rooms.has(code));
 
-    const room = new GameRoom(code, { roomName, maxPlayers, isPublic, password });
+    const room = new GameRoom(code, { roomName, maxPlayers, isPublic, password, turnTimerSeconds });
     room.addPlayer({ socketId: socket.id, name, colorIndex: colorIndex ?? 0, isHost: true });
     rooms.set(code, room);
     socket.join(code);
@@ -161,6 +161,7 @@ io.on("connection", (socket) => {
       return socket.emit("lobby_error", { message: "At least 2 players are required." });
 
     const gameState = room.startGame();
+    gameState.turnTimerSeconds = room.turnTimerSeconds || 0;
     console.log(`[game] started in ${code} with ${room.players.length} players`);
     io.to(code).emit("game_started", gameState);
     broadcastRoomList(); // room disappears from list once started

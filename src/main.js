@@ -197,12 +197,94 @@ const EVENT_DEFS = [
   { id: "charter-flight", title: "Charter Flight", subtitle: "Late-Board Express", icon: "✈", badge: "MOVE", eventType: "acquisition-flight", copy: "Advance to the next landmark, collect a $60 route bonus, and resolve it immediately." },
 ];
 
-const SOUND_EFFECTS = {
-  roll: { src: "assets/audio/dice-roll.mp3", volume: 0.42 },
-  buy: { src: "assets/audio/purchase.mp3", volume: 0.48 },
-  upgrade: { src: "assets/audio/upgrade.mp3", volume: 0.48 },
-  rent: { src: "assets/audio/rent.mp3", volume: 0.48 },
-  win: { src: "assets/audio/victory.mp3", volume: 0.52 },
+// ── Synthesized sound effects (Web Audio API — no files needed) ───────────
+let _audioCtx = null;
+function _getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === "suspended") _audioCtx.resume().catch(() => {});
+  return _audioCtx;
+}
+function _osc(ctx, freq, type, t, dur, vol) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.start(t); o.stop(t + dur + 0.015);
+}
+function _noise(ctx, t, dur, vol, fc) {
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  const filt = ctx.createBiquadFilter();
+  filt.type = "bandpass"; filt.frequency.value = fc || 1200; filt.Q.value = 0.8;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.buffer = buf; src.connect(filt); filt.connect(g); g.connect(ctx.destination);
+  src.start(t); src.stop(t + dur + 0.015);
+}
+const SYNTH_SOUNDS = {
+  roll(ctx) {
+    const t = ctx.currentTime;
+    _noise(ctx, t,       0.07, 0.28, 1600);
+    _noise(ctx, t+0.08,  0.07, 0.22, 1200);
+    _noise(ctx, t+0.17,  0.08, 0.18, 900);
+    _noise(ctx, t+0.27,  0.12, 0.32, 700);
+  },
+  move(ctx) {
+    _osc(ctx, 900, "sine", ctx.currentTime, 0.055, 0.1);
+  },
+  buy(ctx) {
+    const t = ctx.currentTime;
+    [523, 659, 784, 1047].forEach((f, i) => _osc(ctx, f, "sine", t + i*0.09, 0.3, 0.2));
+  },
+  upgrade(ctx) {
+    const t = ctx.currentTime;
+    [330, 440, 554, 659, 880].forEach((f, i) => _osc(ctx, f, "triangle", t + i*0.07, 0.35, 0.18));
+    _noise(ctx, t+0.1, 0.38, 0.07, 2200);
+  },
+  rent(ctx) {
+    const t = ctx.currentTime;
+    _osc(ctx, 1320, "sine", t,      0.06, 0.28);
+    _osc(ctx, 1760, "sine", t+0.05, 0.07, 0.22);
+    _osc(ctx, 880,  "sine", t+0.11, 0.18, 0.15);
+    _noise(ctx, t, 0.1, 0.12, 3200);
+  },
+  tax(ctx) {
+    const t = ctx.currentTime;
+    [440, 370, 294].forEach((f, i) => _osc(ctx, f, "sawtooth", t + i*0.13, 0.28, 0.13));
+  },
+  win(ctx) {
+    const t = ctx.currentTime;
+    [523,659,784,659,784,1047].forEach((f,i) => _osc(ctx, f, "triangle", t+i*0.14, 0.32, 0.23));
+    [261,329,392,523].forEach((f,i)          => _osc(ctx, f, "sine",     t+i*0.14, 0.5,  0.1));
+  },
+  turn_start(ctx) {
+    const t = ctx.currentTime;
+    _osc(ctx, 1174, "sine", t,    0.55, 0.28);
+    _osc(ctx, 1568, "sine", t+0.1, 0.42, 0.18);
+    _osc(ctx, 2093, "sine", t+0.2, 0.36, 0.12);
+  },
+  countdown_tick(ctx) {
+    _osc(ctx, 880, "square", ctx.currentTime, 0.07, 0.07);
+  },
+  countdown_urgent(ctx) {
+    const t = ctx.currentTime;
+    _osc(ctx, 1320, "square", t,      0.08, 0.09);
+    _osc(ctx, 990,  "square", t+0.05, 0.07, 0.07);
+  },
+  bonus(ctx) {
+    const t = ctx.currentTime;
+    [659, 784, 1047, 1319].forEach((f, i) => _osc(ctx, f, "sine", t + i*0.08, 0.28, 0.18));
+  },
+  event(ctx) {
+    const t = ctx.currentTime;
+    _osc(ctx, 440,  "triangle", t,     0.3, 0.2);
+    _osc(ctx, 880,  "triangle", t+0.15, 0.2, 0.15);
+    _noise(ctx, t, 0.25, 0.06, 600);
+  },
 };
 
 const BOARD_POSITIONS = buildBoardPositions(BOARD_SIZE);
@@ -256,6 +338,7 @@ const state = {
   shopStock: [],
   itemModalTab: "shop",
   rankingReady: false,
+  turnTimerSeconds: 0,
   soundEnabled: true,
   audioUnlocked: false,
 };
@@ -263,7 +346,12 @@ const state = {
 let gameMode      = "single"; // "single" | "network"
 let networkSocket = null;    // Socket.io socket (network mode only)
 
-const audioCache = new Map();
+// ── Turn announce + countdown ──────────────────────────────────────────────
+let _announceTimer  = null;
+let _cdInterval     = null;
+let _cdRemaining    = 0;
+
+// audioCache kept for API compatibility (no-op with synth sounds)
 const virtualClock = {
   now: 0,
   timers: [],
@@ -535,10 +623,11 @@ function handleSetupSubmit(event) {
   const names = rows.map((row, index) => row.querySelector("input")?.value.trim() || `Investor ${index + 1}`);
   const colorIndices = rows.map((row) => Number(row.dataset.selectedColor));
 
-  startGame(names, colorIndices);
+  const turnTimerSeconds = Number(document.querySelector('input[name="uiTurnTimer"]:checked')?.value ?? 0);
+  startGame(names, colorIndices, turnTimerSeconds);
 }
 
-function startGame(names, colorIndices = []) {
+function startGame(names, colorIndices = [], turnTimerSeconds = 0) {
   resetVirtualClock();
   state.players = names.map((name, index) => {
     const paletteIndex = colorIndices[index] ?? index % COLOR_PALETTE.length;
@@ -573,6 +662,7 @@ function startGame(names, colorIndices = []) {
   state.winnerReason = null;
   state.shopStock = generateShopStock();
   state.rankingReady = false;
+  state.turnTimerSeconds = Number(turnTimerSeconds) || 0;
 
   addLog(
     `${currentPlayer().name} begins on START with $${formatMoney(STARTING_CASH)} and a full 40-space board to circle.`,
@@ -1606,6 +1696,7 @@ function handleContextAction() {
 
 async function handleRoll() {
   if (gameMode === "network") {
+    stopTurnTimer();
     networkSocket?.emit("roll_dice", { code: lobbyState.roomCode });
     return;
   }
@@ -1668,6 +1759,7 @@ async function movePlayer(player, spaces) {
     }
 
     render();
+    playSound("move");
     await delay(MOVE_STEP_MS);
   }
 }
@@ -1738,6 +1830,7 @@ async function resolveEvent(player, space) {
         addLog(`${player.name}'s Tax Shield absorbed the city tax.`);
       } else {
         const loss = 150;
+        playSound("tax");
         applyCharge(player, loss, "city tax");
       }
       checkForEndConditions("corner-tax");
@@ -1747,6 +1840,7 @@ async function resolveEvent(player, space) {
     case "tourism-boom": {
       const payout = 120 + ownedLandmarks(player.id).length * 25;
       player.cash += payout;
+      playSound("bonus");
       addLog(`${player.name} capitalized on a Tourism Boom for $${formatMoney(payout)}.`);
       checkForEndConditions("tourism-boom");
       return false;
@@ -1963,10 +2057,12 @@ function handleUpgrade(landmarkId) {
 
 function handleEndTurn() {
   if (gameMode === "network") {
+    stopTurnTimer();
     networkSocket?.emit("end_turn", { code: lobbyState.roomCode });
     return;
   }
 
+  stopTurnTimer();
   if (state.turnBusy || state.gameOver || !state.turnStarted) {
     return;
   }
@@ -2024,6 +2120,10 @@ function handleEndTurn() {
     } else {
       addLog(`${currentPlayer().name} is now at the table.`);
       render();
+      showTurnAnnounce(currentPlayer());
+      if (state.turnTimerSeconds > 0) {
+        setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+      }
     }
     return;
   }
@@ -2357,26 +2457,8 @@ function formatMoney(value) {
   return Math.round(value).toLocaleString("en-US");
 }
 
-function playPurchaseSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      const t = ctx.currentTime + i * 0.09;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-      osc.start(t);
-      osc.stop(t + 0.3);
-    });
-  } catch (_) { /* audio not available */ }
-}
+
+
 
 function randomDie() {
   return Math.floor(Math.random() * 6) + 1;
@@ -2438,6 +2520,93 @@ function resetVirtualClock() {
     }
   });
   virtualClock.timers = [];
+}
+
+// ── Turn announce ─────────────────────────────────────────────────────────
+function showTurnAnnounce(player) {
+  const el = document.getElementById("turnAnnounce");
+  if (!el || !player) return;
+  const color = player.color || "#efc77b";
+  const glow  = player.glow  || "rgba(239,199,123,0.5)";
+  el.innerHTML = `
+    <div class="turn-announce-inner" style="--player-color:${color};--player-glow:${glow};">
+      <div class="turn-announce-aura"></div>
+      <span class="turn-announce-name" style="color:${color};">${player.name}</span>
+      <span class="turn-announce-label">Your Turn!</span>
+    </div>`;
+  el.classList.remove("hidden", "turn-announce-exit");
+  el.classList.add("turn-announce-enter");
+  playSound("turn_start");
+  if (_announceTimer) clearTimeout(_announceTimer);
+  _announceTimer = setTimeout(() => {
+    el.classList.remove("turn-announce-enter");
+    el.classList.add("turn-announce-exit");
+    setTimeout(() => el.classList.add("hidden"), 580);
+  }, 2100);
+}
+
+function startTurnTimer(seconds) {
+  stopTurnTimer();
+  _cdRemaining = seconds;
+  _renderCountdown();
+  const el = document.getElementById("turnCountdown");
+  if (el) el.classList.remove("hidden");
+  _cdInterval = setInterval(() => {
+    _cdRemaining--;
+    _renderCountdown();
+    if (_cdRemaining <= 5 && _cdRemaining > 0) {
+      playSound("countdown_urgent");
+    } else if (_cdRemaining > 5) {
+      playSound("countdown_tick");
+    }
+    if (_cdRemaining <= 0) {
+      stopTurnTimer();
+      autoAdvanceTurn();
+    }
+  }, 1000);
+}
+
+function stopTurnTimer() {
+  if (_cdInterval) { clearInterval(_cdInterval); _cdInterval = null; }
+  const el = document.getElementById("turnCountdown");
+  if (el) el.classList.add("hidden");
+}
+
+function _renderCountdown() {
+  const el = document.getElementById("turnCountdown");
+  if (!el) return;
+  const total = state.turnTimerSeconds || 60;
+  const pct   = Math.max(0, _cdRemaining / total);
+  const hue   = Math.round(pct * 120); // 120=green → 60=yellow → 0=red
+  const r     = 34;
+  const circ  = 2 * Math.PI * r;
+  const urgent = _cdRemaining <= 5;
+  el.innerHTML = `
+    <div class="countdown-ring${urgent ? " countdown-urgent" : ""}" style="--countdown-color:hsl(${hue},88%,58%);">
+      <svg viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="6"/>
+        <circle cx="40" cy="40" r="${r}" fill="none"
+          stroke="hsl(${hue},88%,58%)" stroke-width="6"
+          stroke-dasharray="${circ.toFixed(2)}"
+          stroke-dashoffset="${(circ * (1 - pct)).toFixed(2)}"
+          stroke-linecap="round"
+          style="transform:rotate(-90deg);transform-origin:40px 40px;transition:stroke-dashoffset 0.92s linear,stroke 0.5s;"/>
+      </svg>
+      <span class="countdown-number" style="color:hsl(${hue},88%,58%);">${_cdRemaining}</span>
+    </div>`;
+}
+
+function autoAdvanceTurn() {
+  if (state.gameOver || state.turnBusy) return;
+  if (gameMode === "network") {
+    const me = state.players[state.currentPlayerIndex];
+    if (me?.socketId !== networkSocket?.id) return;
+  }
+  if (!state.turnStarted) {
+    handleRoll();
+  } else {
+    handleEndTurn();
+  }
 }
 
 function exposeDebugHooks() {
@@ -2549,39 +2718,20 @@ async function toggleFullscreen() {
 }
 
 function primeAudio() {
-  Object.values(SOUND_EFFECTS).forEach(({ src }) => {
-    if (audioCache.has(src)) {
-      return;
-    }
-    const audio = new Audio(src);
-    audio.preload = "auto";
-    audioCache.set(src, audio);
-  });
+  // Sounds are synthesized — no preloading needed
 }
 
 function unlockAudio() {
   state.audioUnlocked = true;
+  try { _getAudioCtx(); } catch (_) {}
 }
 
 function playSound(key) {
-  if (!state.soundEnabled || !state.audioUnlocked) {
-    return;
-  }
-
-  const config = SOUND_EFFECTS[key];
-  if (!config) {
-    return;
-  }
-
-  const baseAudio = audioCache.get(config.src) ?? new Audio(config.src);
-  if (!audioCache.has(config.src)) {
-    baseAudio.preload = "auto";
-    audioCache.set(config.src, baseAudio);
-  }
-
-  const instance = baseAudio.cloneNode();
-  instance.volume = config.volume;
-  instance.play().catch(() => {});
+  if (!state.soundEnabled) return;
+  try {
+    const ctx = _getAudioCtx();
+    SYNTH_SOUNDS[key]?.(ctx);
+  } catch (_) {}
 }
 
 // ── Item system ───────────────────────────────────────────────────────────
@@ -2758,7 +2908,7 @@ function handleItemBuy(itemId) {
   player.cash -= item.price;
   player.inventory.push(item.id);
   addLog(`${player.name} purchased ${item.icon} ${item.name} for $${formatMoney(item.price)}.`);
-  playPurchaseSound();
+  playSound("buy");
   state.turnStarted = true;
   renderItemModal();
   render();
@@ -3126,8 +3276,10 @@ const lobbyState = {
   errorMsg:        "",
   browseRooms:     [],
   maxPlayers:      4,
-  isPublic:          true,
-  suggestedRoomName: "",
+  isPublic:           true,
+  suggestedRoomName:  "",
+  turnTimerEnabled:   false,
+  turnTimerSeconds:   60,
 };
 
 function _lobbyColorSwatches(selectedIndex, takenSet = new Set()) {
@@ -3236,6 +3388,17 @@ function renderLobby(screen) {
         </div>
         ${!lobbyState.isPublic ? `
         <p class="lobby-private-note">🔒 Room is visible in the list, but a 6-digit code is required to enter.<br>Share the code only with invited players.</p>` : ""}
+
+        <label class="lobby-label" style="margin-top:0.9rem;">Turn Timer</label>
+        <div class="lobby-toggle-row">
+          <button class="lobby-toggle-btn ${!lobbyState.turnTimerEnabled ? "active" : ""}" onclick="lobbySetTurnTimer(false)">⏸ Off</button>
+          <button class="lobby-toggle-btn ${lobbyState.turnTimerEnabled ? "active" : ""}" onclick="lobbySetTurnTimer(true)">⏱ On</button>
+        </div>
+        ${lobbyState.turnTimerEnabled ? `
+        <div class="lobby-timer-opts">
+          ${[30,60,90,120].map(s => `<label class="lobby-radio-label"><input type="radio" name="lobbyTimerSecs" value="${s}" ${lobbyState.turnTimerSeconds === s ? "checked" : ""} onchange="lobbySetTurnTimerSeconds(${s})"><span>${s}s</span></label>`).join("")}
+        </div>
+        <p class="lobby-timer-note">Auto-advance turn when time runs out.</p>` : ""}
       </div>
       <div class="lobby-row" style="margin-top:1.2rem;">
         ${backBtn}
@@ -3451,6 +3614,15 @@ function lobbySetPublic(isPublic) {
   renderLobby(); // re-render create screen to show/hide pw field
 }
 
+function lobbySetTurnTimer(enabled) {
+  lobbyState.turnTimerEnabled = enabled;
+  renderLobby();
+}
+
+function lobbySetTurnTimerSeconds(s) {
+  lobbyState.turnTimerSeconds = s;
+}
+
 function lobbyShowCreate() {
   const nameEl = document.getElementById("lobbyPlayerName");
   if (nameEl) {
@@ -3599,12 +3771,28 @@ function attachSocketHandlers(socket) {
     ui.winnerOverlay.classList.add("hidden");
     primeAudio();
     render();
+    const firstPlayer = state.players[0];
+    showTurnAnnounce(firstPlayer);
+    if (state.turnTimerSeconds > 0) {
+      const isMyTurn = firstPlayer?.socketId === socket.id;
+      if (isMyTurn) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+    }
   });
 
   socket.on("state_update", (serverState) => {
+    const prevIdx = state.currentPlayerIndex;
     applyServerState(serverState);
     if (serverState.gameOver) {
+      stopTurnTimer();
       renderWinnerOverlay();
+    } else if (serverState.currentPlayerIndex !== undefined && serverState.currentPlayerIndex !== prevIdx) {
+      const newPlayer = state.players[serverState.currentPlayerIndex];
+      showTurnAnnounce(newPlayer);
+      if (state.turnTimerSeconds > 0) {
+        const isMyTurn = newPlayer?.socketId === socket.id;
+        stopTurnTimer();
+        if (isMyTurn) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
+      }
     }
     render();
   });
@@ -3624,10 +3812,14 @@ function applyServerState(serverState) {
   }
   // Merge server state, preserving client-only UI fields
   const preserved = {
-    soundEnabled:  state.soundEnabled,
-    audioUnlocked: state.audioUnlocked,
-    itemModalTab:  state.itemModalTab,
+    soundEnabled:     state.soundEnabled,
+    audioUnlocked:    state.audioUnlocked,
+    itemModalTab:     state.itemModalTab,
   };
+  // Preserve turnTimerSeconds if server doesn't send it
+  if (serverState.turnTimerSeconds === undefined) {
+    preserved.turnTimerSeconds = state.turnTimerSeconds;
+  }
   Object.assign(state, serverState, preserved);
 }
 
@@ -3643,11 +3835,12 @@ function lobbyConfirmCreate() {
 
   socket.emit("create_room", {
     name,
-    colorIndex: lobbyState.colorIndex,
+    colorIndex:      lobbyState.colorIndex,
     roomName,
-    maxPlayers: lobbyState.maxPlayers,
-    isPublic:   lobbyState.isPublic,
-    password:   "",
+    maxPlayers:      lobbyState.maxPlayers,
+    isPublic:        lobbyState.isPublic,
+    password:        "",
+    turnTimerSeconds: lobbyState.turnTimerEnabled ? lobbyState.turnTimerSeconds : 0,
   });
 }
 
@@ -3693,6 +3886,8 @@ window.lobbyExit             = lobbyExit;
 window.lobbyPickColor        = lobbyPickColor;
 window.lobbySetMaxPlayers    = lobbySetMaxPlayers;
 window.lobbySetPublic        = lobbySetPublic;
+window.lobbySetTurnTimer     = lobbySetTurnTimer;
+window.lobbySetTurnTimerSeconds = lobbySetTurnTimerSeconds;
 window.lobbyShowCreate       = lobbyShowCreate;
 window.lobbyShowBrowse       = lobbyShowBrowse;
 window.lobbyRefreshBrowse    = lobbyRefreshBrowse;
