@@ -1,3 +1,73 @@
+import { SEED_CATALOG, getSeed, getRandomSeed, buildLandmarkDefs } from "./seeds.js";
+
+// ── Character Definitions ─────────────────────────────────────────────────
+const CHARACTER_DEFS = [
+  {
+    id: "tycoon", name: "Mr. Tycoon", title: "Real Estate Mogul", icon: "🏛",
+    portrait: "assets/characters/tycoon.png", mini: "assets/characters/tycoon-mini.png",
+    passive: { id: "land-discount", name: "Land Discount", desc: "Buy landmarks at 10% off", params: { discount: 0.10 } }
+  },
+  {
+    id: "broker", name: "Ms. Broker", title: "Stock Broker", icon: "📈",
+    portrait: "assets/characters/broker.png", mini: "assets/characters/broker-mini.png",
+    passive: { id: "rent-boost", name: "Rent Boost", desc: "Collect 15% extra rent", params: { boost: 0.15 } }
+  },
+  {
+    id: "architect", name: "Dr. Architect", title: "Master Builder", icon: "📐",
+    portrait: "assets/characters/architect.png", mini: "assets/characters/architect-mini.png",
+    passive: { id: "upgrade-discount", name: "Upgrade Discount", desc: "Upgrade costs 15% less", params: { discount: 0.15 } }
+  },
+  {
+    id: "explorer", name: "Cpt. Explorer", title: "World Adventurer", icon: "🧭",
+    portrait: "assets/characters/explorer.png", mini: "assets/characters/explorer-mini.png",
+    passive: { id: "extra-move", name: "Extra Move", desc: "+1 extra space per roll", params: { extra: 1 } }
+  },
+  {
+    id: "banker", name: "Lady Banker", title: "Finance Queen", icon: "🏦",
+    portrait: "assets/characters/banker.png", mini: "assets/characters/banker-mini.png",
+    passive: { id: "interest", name: "Interest", desc: "Earn 3% interest on cash each round", params: { rate: 0.03 } }
+  },
+  {
+    id: "gambler", name: "Lucky Gambler", title: "Fortune Chaser", icon: "🎰",
+    portrait: "assets/characters/gambler.png", mini: "assets/characters/gambler-mini.png",
+    passive: { id: "double-or-nothing", name: "Double or Nothing", desc: "50% chance for 2x START bonus", params: { chance: 0.5 } }
+  },
+  {
+    id: "diplomat", name: "Ambassador", title: "Peace Negotiator", icon: "🤝",
+    portrait: "assets/characters/diplomat.png", mini: "assets/characters/diplomat-mini.png",
+    passive: { id: "tax-shield", name: "Tax Shield", desc: "Pay 30% less tax", params: { reduction: 0.30 } }
+  },
+  {
+    id: "engineer", name: "Chief Engineer", title: "Tech Innovator", icon: "⚙",
+    portrait: "assets/characters/engineer.png", mini: "assets/characters/engineer-mini.png",
+    passive: { id: "fast-build", name: "Fast Build", desc: "Free auto-upgrade on purchase", params: {} }
+  },
+  {
+    id: "spy", name: "Shadow Agent", title: "Covert Operative", icon: "🕵",
+    portrait: "assets/characters/spy.png", mini: "assets/characters/spy-mini.png",
+    passive: { id: "intel", name: "Intel", desc: "Get 15% cashback on rent paid", params: { cashback: 0.15 } }
+  },
+  {
+    id: "merchant", name: "Grand Merchant", title: "Trade Master", icon: "💰",
+    portrait: "assets/characters/merchant.png", mini: "assets/characters/merchant-mini.png",
+    passive: { id: "trade-bonus", name: "Trade Bonus", desc: "Buy items at 20% off", params: { discount: 0.20 } }
+  },
+  {
+    id: "oracle", name: "The Oracle", title: "Mystic Seer", icon: "🔮",
+    portrait: "assets/characters/oracle.png", mini: "assets/characters/oracle-mini.png",
+    passive: { id: "foresight", name: "Foresight", desc: "2x chance for bonus events", params: { multiplier: 2 } }
+  },
+  {
+    id: "commander", name: "Commander", title: "Strategic Leader", icon: "⚔",
+    portrait: "assets/characters/commander.png", mini: "assets/characters/commander-mini.png",
+    passive: { id: "rally", name: "Rally", desc: "+10% rent with 3+ buildings", params: { threshold: 3, boost: 0.10 } }
+  },
+];
+
+function getCharacter(id) { return CHARACTER_DEFS.find(c => c.id === id) || CHARACTER_DEFS[0]; }
+
+let _diceInitialized = false;
+
 const BOARD_SIZE = 11;
 const BOARD_SPACES = 40;
 const STARTING_CASH = 1500;
@@ -61,127 +131,10 @@ const ITEM_DEFS = [
   { id: "landmark-swap",    name: "Landmark Swap",       icon: "🔄", grade: "legendary", price: 380, timing: "immediate",   target: "opp-lm",      desc: "Swap one of your landmarks with an opponent's of equal or lower tier." },
 ];
 
-const TONE_PALETTE = [
-  "rgba(89, 198, 193, 0.16)",
-  "rgba(239, 199, 123, 0.16)",
-  "rgba(245, 143, 127, 0.16)",
-  "rgba(147, 220, 255, 0.18)",
-  "rgba(155, 227, 124, 0.16)",
-  "rgba(201, 170, 255, 0.16)",
-  "rgba(255, 188, 134, 0.16)",
-];
-
-const LANDMARK_IMAGES = {
-  "central-park": "assets/landmarks/central-park.png",
-  "ueno-park": "assets/landmarks/ueno-park.png",
-  "tivoli-gardens": "assets/landmarks/tivoli-gardens.png",
-  "tower-bridge": "assets/landmarks/tower-bridge.png",
-  "tokyo-tower": "assets/landmarks/tokyo-tower.png",
-  "big-ben": "assets/landmarks/big-ben.png",
-  colosseum: "assets/landmarks/colosseum.png",
-  "gardens-by-the-bay": "assets/landmarks/gardens-by-the-bay.png",
-  "luna-park": "assets/landmarks/luna-park.png",
-  "sagrada-familia": "assets/landmarks/sagrada-familia.png",
-  "eiffel-tower": "assets/landmarks/eiffel-tower.png",
-  "statue-of-liberty": "assets/landmarks/statue-of-liberty.png",
-  "louvre-museum": "assets/landmarks/louvre-museum.png",
-  "sydney-opera-house": "assets/landmarks/sydney-opera-house.png",
-  disneyland: "assets/landmarks/disneyland.png",
-  "great-wall": "assets/landmarks/great-wall.png",
-  acropolis: "assets/landmarks/acropolis.png",
-  "taj-mahal": "assets/landmarks/taj-mahal.png",
-  "buckingham-palace": "assets/landmarks/buckingham-palace.png",
-  "cn-tower": "assets/landmarks/cn-tower.png",
-  "petronas-towers": "assets/landmarks/petronas-towers.png",
-  "one-world-trade": "assets/landmarks/one-world-trade.png",
-  "marina-bay-sands": "assets/landmarks/marina-bay-sands.png",
-  "shanghai-tower": "assets/landmarks/shanghai-tower.png",
-  "chichen-itza": "assets/landmarks/chichen-itza.png",
-  "machu-picchu": "assets/landmarks/machu-picchu.png",
-  "angkor-wat": "assets/landmarks/angkor-wat.png",
-  "burj-khalifa": "assets/landmarks/burj-khalifa.png",
-};
-
-const LANDMARK_MINIATURES = {
-  "central-park": { profile: "garden", crest: "CP" },
-  "ueno-park": { profile: "garden", crest: "UP" },
-  "tivoli-gardens": { profile: "garden", crest: "TG" },
-  disneyland: { profile: "garden", crest: "DL" },
-  "tokyo-tower": { profile: "spire", crest: "TT" },
-  "tower-bridge": { profile: "bridge", crest: "TB" },
-  "big-ben": { profile: "clocktower", crest: "BB" },
-  "gardens-by-the-bay": { profile: "garden", crest: "GB" },
-  "luna-park": { profile: "garden", crest: "LP" },
-  colosseum: { profile: "heritage", crest: "CO" },
-  "sagrada-familia": { profile: "cathedral", crest: "SF" },
-  "eiffel-tower": { profile: "spire", crest: "ET" },
-  "statue-of-liberty": { profile: "statue", crest: "SL" },
-  "louvre-museum": { profile: "palace", crest: "LM" },
-  "sydney-opera-house": { profile: "opera", crest: "SO" },
-  "great-wall": { profile: "heritage", crest: "GW" },
-  acropolis: { profile: "heritage", crest: "AC" },
-  "taj-mahal": { profile: "palace", crest: "TM" },
-  "buckingham-palace": { profile: "palace", crest: "BP" },
-  "cn-tower": { profile: "spire", crest: "CN" },
-  "petronas-towers": { profile: "twinspire", crest: "PT" },
-  "one-world-trade": { profile: "skyscraper", crest: "OW" },
-  "marina-bay-sands": { profile: "skydeck", crest: "MB" },
-  "shanghai-tower": { profile: "skyscraper", crest: "ST" },
-  "chichen-itza": { profile: "heritage", crest: "CI" },
-  "machu-picchu": { profile: "heritage", crest: "MP" },
-  "angkor-wat": { profile: "heritage", crest: "AW" },
-  "burj-khalifa": { profile: "spire", crest: "BK" },
-};
-
-const LANDMARK_SEEDS = [
-  { id: "central-park", name: "Central Park", city: "New York, USA", phase: "Early", flavor: "An opening-route park with stable foot traffic and low-friction returns." },
-  { id: "ueno-park", name: "Ueno Park", city: "Tokyo, Japan", phase: "Early", flavor: "Low-cost green-space traffic makes this a clean early-game pickup." },
-  { id: "tivoli-gardens", name: "Tivoli Gardens", city: "Copenhagen, Denmark", phase: "Early", flavor: "A compact amusement park with steady income and gentle upgrade pressure." },
-  { id: "disneyland", name: "Disneyland", city: "Anaheim, USA", phase: "Early", flavor: "A famous park attraction that still plays like an early-route income engine." },
-  { id: "tokyo-tower", name: "Tokyo Tower", city: "Tokyo, Japan", phase: "Early", flavor: "A nimble observation tower that scales cleanly once the first upgrades land." },
-  { id: "tower-bridge", name: "Tower Bridge", city: "London, UK", phase: "Early", flavor: "Compact entry pricing with dependable sightseeing income on the first side." },
-  { id: "big-ben", name: "Big Ben", city: "London, UK", phase: "Early", flavor: "A small but steady city-center attraction that stays relevant deep into the game." },
-  { id: "gardens-by-the-bay", name: "Gardens by the Bay", city: "Singapore", phase: "Early", flavor: "A polished garden attraction that closes the early route with higher upside." },
-  { id: "luna-park", name: "Luna Park", city: "Sydney, Australia", phase: "Early", flavor: "A classic waterfront attraction with approachable pricing and solid visitor flow." },
-  { id: "colosseum", name: "Colosseum", city: "Rome, Italy", phase: "Mid", flavor: "Historic prestige converted into reliable tourism income once the board matures." },
-  { id: "sagrada-familia", name: "Sagrada Familia", city: "Barcelona, Spain", phase: "Mid", flavor: "A famous cultural landmark with a strong development curve." },
-  { id: "eiffel-tower", name: "Eiffel Tower", city: "Paris, France", phase: "Mid", flavor: "Prestige icon status with elegant rent scaling from the first upgrade onward." },
-  { id: "statue-of-liberty", name: "Statue of Liberty", city: "New York, USA", phase: "Mid", flavor: "Steady transatlantic demand keeps this harbor landmark in constant play." },
-  { id: "louvre-museum", name: "Louvre Museum", city: "Paris, France", phase: "Mid", flavor: "Dense foot traffic and global brand power make this a stable compounder." },
-  { id: "sydney-opera-house", name: "Sydney Opera House", city: "Sydney, Australia", phase: "Mid", flavor: "A destination asset with premium rent growth and strong board presence." },
-  { id: "great-wall", name: "Great Wall", city: "Beijing, China", phase: "Mid", flavor: "Global recognition and broad appeal translate into resilient mid-board cash flow." },
-  { id: "acropolis", name: "Acropolis", city: "Athens, Greece", phase: "Mid", flavor: "A history-first holding that converts upgrades directly into prestige pricing." },
-  { id: "taj-mahal", name: "Taj Mahal", city: "Agra, India", phase: "Mid", flavor: "World-famous destination appeal gives this site strong value even before upgrades." },
-  { id: "buckingham-palace", name: "Buckingham Palace", city: "London, UK", phase: "Mid", flavor: "A ceremonial icon that monetizes global attention exceptionally well." },
-  { id: "cn-tower", name: "CN Tower", city: "Toronto, Canada", phase: "Late", flavor: "A skyline-heavy tower asset that marks the turn into the expensive late route." },
-  { id: "petronas-towers", name: "Petronas Towers", city: "Kuala Lumpur, Malaysia", phase: "Late", flavor: "Twin-tower status and prestige branding create sharp late-game upside." },
-  { id: "one-world-trade", name: "One World Trade Center", city: "New York, USA", phase: "Late", flavor: "A high-value skyscraper holding with strong rent scaling." },
-  { id: "marina-bay-sands", name: "Marina Bay Sands", city: "Singapore", phase: "Late", flavor: "A skyline-defining mega complex with one of the cleanest late-board ceilings." },
-  { id: "shanghai-tower", name: "Shanghai Tower", city: "Shanghai, China", phase: "Late", flavor: "Premium vertical real estate keeps this site punishing once improved." },
-  { id: "chichen-itza", name: "Chichen Itza", city: "Yucatan, Mexico", phase: "Late", flavor: "A mega landmark with massive draw and heavyweight balance-sheet value." },
-  { id: "machu-picchu", name: "Machu Picchu", city: "Cusco Region, Peru", phase: "Late", flavor: "Remote mystique commands top-tier income once capital reaches the final side." },
-  { id: "angkor-wat", name: "Angkor Wat", city: "Siem Reap, Cambodia", phase: "Late", flavor: "Monumental cultural gravity converts directly into top-end portfolio strength." },
-  { id: "burj-khalifa", name: "Burj Khalifa", city: "Dubai, UAE", phase: "Late", flavor: "The final skyscraper on the loop with the most dominant upgrade ceiling on the board." },
-];
-
-const LANDMARK_COSTS = [
-  120, 130, 140, 150, 160, 170, 180, 190, 205, 220, 230, 240, 255, 265,
-  280, 295, 310, 325, 340, 355, 370, 385, 400, 420, 440, 460, 480, 520,
-];
-
-const LANDMARK_DEFS = LANDMARK_SEEDS.map((seed, index) => {
-  const cost = LANDMARK_COSTS[index];
-  return {
-    ...seed,
-    cost,
-    baseRent: Math.round(cost * 0.18),
-    upgradeCost: Math.round(cost * 0.58),
-    tone: TONE_PALETTE[index % TONE_PALETTE.length],
-    image: LANDMARK_IMAGES[seed.id] ?? "assets/ui/world-landmark-main-board.png",
-    miniProfile: LANDMARK_MINIATURES[seed.id]?.profile ?? "skyscraper",
-    miniCrest: LANDMARK_MINIATURES[seed.id]?.crest ?? seed.name.slice(0, 2).toUpperCase(),
-  };
-});
+// ── Active seed state (rebuilt on each game start) ────────────────────────
+let activeSeed = getSeed("world-landmarks");
+let activeSeedId = localStorage.getItem("bgame_seedId") || "world-landmarks";
+let LANDMARK_DEFS = buildLandmarkDefs(activeSeed);
 
 const EVENT_DEFS = [
   { id: "start-square", title: "START", subtitle: "Launch Pad", icon: "S", badge: "START", eventType: "start", copy: "Pass for $200. Land exactly for a $150 launch bonus." },
@@ -313,10 +266,136 @@ const SYNTH_SOUNDS = {
     [523, 784, 1047, 1319, 1568].forEach((f, i) =>
       _osc(ctx, f, "sine", t + 0.22 + i * 0.07, 0.4, 0.15));
   },
+  whoosh(ctx) {
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(200, t);
+    o.frequency.exponentialRampToValueAtTime(800, t + 0.25);
+    g.gain.setValueAtTime(0.2, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.35);
+    _noise(ctx, t, 0.3, 0.1, 3000);
+  },
+  sparkle(ctx) {
+    const t = ctx.currentTime;
+    [1568, 2093, 2637, 3136].forEach((f, i) =>
+      _osc(ctx, f, "sine", t + i * 0.06, 0.18, 0.12));
+  },
+  swoosh(ctx) {
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(900, t);
+    o.frequency.exponentialRampToValueAtTime(200, t + 0.3);
+    g.gain.setValueAtTime(0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.4);
+    _noise(ctx, t + 0.05, 0.25, 0.08, 2000);
+  },
+  cash_fly(ctx) {
+    const t = ctx.currentTime;
+    _noise(ctx, t, 0.3, 0.12, 2400);
+    [1200, 1400, 1600].forEach((f, i) => _osc(ctx, f, "sine", t + i * 0.06, 0.08, 0.06));
+  },
+  cash_in(ctx) {
+    const t = ctx.currentTime;
+    _osc(ctx, 1568, "sine", t, 0.12, 0.22);
+    _osc(ctx, 2093, "sine", t + 0.06, 0.14, 0.18);
+    _noise(ctx, t + 0.04, 0.08, 0.08, 4000);
+  },
+  cash_out(ctx) {
+    const t = ctx.currentTime;
+    _osc(ctx, 880, "sine", t, 0.15, 0.18);
+    _osc(ctx, 660, "sine", t + 0.08, 0.12, 0.14);
+    _noise(ctx, t, 0.12, 0.06, 1800);
+  },
+  cash_drain(ctx) {
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = "sawtooth"; o.frequency.setValueAtTime(600, t);
+    o.frequency.exponentialRampToValueAtTime(200, t + 0.4);
+    g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    o.start(t); o.stop(t + 0.42);
+    _noise(ctx, t, 0.35, 0.08, 800);
+  },
+  coins_shower(ctx) {
+    const t = ctx.currentTime;
+    for (let i = 0; i < 8; i++) {
+      const f = 2000 + Math.random() * 2000;
+      _osc(ctx, f, "sine", t + i * 0.04, 0.06, 0.08);
+    }
+    _noise(ctx, t, 0.3, 0.06, 5000);
+  },
+  sparkle_high(ctx) {
+    const t = ctx.currentTime;
+    [2637, 3136, 3520, 4186].forEach((f, i) => _osc(ctx, f, "sine", t + i * 0.05, 0.12, 0.1));
+  },
+  impact(ctx) {
+    const t = ctx.currentTime;
+    _osc(ctx, 80, "sine", t, 0.18, 0.3);
+    _noise(ctx, t, 0.12, 0.2, 600);
+  },
+  celebrate_early(ctx) {
+    const t = ctx.currentTime;
+    [523, 659, 784].forEach((f, i) => _osc(ctx, f, "sine", t + i * 0.08, 0.25, 0.16));
+    _noise(ctx, t + 0.1, 0.15, 0.06, 3000);
+  },
+  celebrate_mid(ctx) {
+    const t = ctx.currentTime;
+    [523, 659, 784, 1047].forEach((f, i) => _osc(ctx, f, "triangle", t + i * 0.07, 0.3, 0.2));
+    [262, 330, 392].forEach((f, i) => _osc(ctx, f, "sine", t + i * 0.07, 0.4, 0.08));
+    _noise(ctx, t + 0.08, 0.2, 0.1, 3500);
+  },
+  celebrate_late(ctx) {
+    const t = ctx.currentTime;
+    [523, 659, 784, 1047, 1319].forEach((f, i) => _osc(ctx, f, "triangle", t + i * 0.06, 0.35, 0.22));
+    [262, 330, 392, 523].forEach((f, i) => _osc(ctx, f, "sine", t + i * 0.06, 0.5, 0.1));
+    _noise(ctx, t, 0.3, 0.15, 4000);
+    _noise(ctx, t + 0.15, 0.2, 0.1, 1200);
+  },
+  fanfare(ctx) {
+    const t = ctx.currentTime;
+    [784, 988, 1175, 1319, 1568].forEach((f, i) => _osc(ctx, f, "triangle", t + i * 0.1, 0.4, 0.2));
+    [392, 494, 587].forEach((f, i) => _osc(ctx, f, "sine", t + i * 0.1, 0.6, 0.12));
+    _noise(ctx, t + 0.2, 0.35, 0.12, 2000);
+  },
+  grand_fanfare(ctx) {
+    const t = ctx.currentTime;
+    [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, i) => _osc(ctx, f, "triangle", t + i * 0.08, 0.45, 0.22));
+    [262, 330, 392, 523, 659].forEach((f, i) => _osc(ctx, f, "sine", t + i * 0.08, 0.6, 0.14));
+    _noise(ctx, t, 0.15, 0.18, 1400);
+    _noise(ctx, t + 0.2, 0.4, 0.14, 3000);
+    _osc(ctx, 65, "sine", t, 0.3, 0.25);
+  },
 };
 
 const BOARD_POSITIONS = buildBoardPositions(BOARD_SIZE);
-const SPACE_DEFS = buildSpaceDefs();
+let SPACE_DEFS = buildSpaceDefs();
+
+// ── Seed loading (rebuilds LANDMARK_DEFS + SPACE_DEFS + board center) ────
+function loadSeed(seedId, shuffle = true) {
+  activeSeed = getSeed(seedId);
+  activeSeedId = seedId;
+  localStorage.setItem("bgame_seedId", seedId);
+  LANDMARK_DEFS = buildLandmarkDefs(activeSeed, shuffle);
+  SPACE_DEFS = buildSpaceDefs();
+  // Update board center background
+  const bc = document.querySelector(".board-center");
+  if (bc) {
+    const img = activeSeed.boardCenter || "assets/ui/world-landmark-main-board.png";
+    bc.style.backgroundImage = `url('${img}'), linear-gradient(145deg, #0e2535, #081520)`;
+  }
+  // Update sidebar seed label
+  const seedLabel = document.getElementById("sidebarSeedLabel");
+  if (seedLabel) seedLabel.textContent = `${activeSeed.icon} ${activeSeed.name}`;
+  // Update mode label
+  const modeLabel = document.getElementById("sidebarModeLabel");
+  if (modeLabel) modeLabel.textContent = gameMode === "network" ? "Online Play" : "Local Play";
+}
 
 const ui = {
   board: document.querySelector("#board"),
@@ -380,11 +459,6 @@ let _roundAnnounceTimer = null;
 let _cdInterval         = null;
 let _cdRemaining        = 0;
 
-// audioCache kept for API compatibility (no-op with synth sounds)
-const virtualClock = {
-  now: 0,
-  timers: [],
-};
 
 validateBoardLayout();
 initialize();
@@ -411,10 +485,30 @@ function clearAnnounceOverlays() {
   if (ra) ra.classList.add("hidden");
   if (_announceTimer)      { clearTimeout(_announceTimer);      _announceTimer = null; }
   if (_roundAnnounceTimer) { clearTimeout(_roundAnnounceTimer); _roundAnnounceTimer = null; }
+  // Cancel AI turn timer
+  _cancelAITurn();
+  // Force stop game state
+  if (state) state.gameOver = true;
+  // Remove any flying character cards
+  document.querySelectorAll(".flying-char-card").forEach(el => el.remove());
+  // Remove screen shake
+  document.body.classList.remove("screen-shake");
+  // Clear any money particles
+  document.querySelectorAll(".money-particle, .confetti-particle, .celebrate-ring").forEach(el => el.remove());
+  // Stop fireworks canvas
+  const fc = document.getElementById("fireworksCanvas");
+  if (fc) { fc.classList.add("hidden"); fc.style.display = ""; }
 }
 
 function initialize() {
   ui.board.style.setProperty("--board-size", String(BOARD_SIZE));
+  // Restore saved player count
+  const savedPlayerCount = localStorage.getItem("bgame_playerCount");
+  if (savedPlayerCount) {
+    ui.playerCountSelect.value = savedPlayerCount;
+    const radio = document.querySelector(`input[name="uiPlayerCount"][value="${savedPlayerCount}"]`);
+    if (radio) radio.checked = true;
+  }
   renderPlayerFields(Number(ui.playerCountSelect.value));
   ui.playerCountSelect.addEventListener("change", () => {
     renderPlayerFields(Number(ui.playerCountSelect.value));
@@ -422,6 +516,7 @@ function initialize() {
   document.querySelectorAll('input[name="uiPlayerCount"]').forEach((radio) => {
     radio.addEventListener("change", () => {
       ui.playerCountSelect.value = radio.value;
+      localStorage.setItem("bgame_playerCount", radio.value);
       ui.playerCountSelect.dispatchEvent(new Event("change"));
     });
   });
@@ -431,6 +526,18 @@ function initialize() {
     const sel = document.getElementById("roundLimitSelect");
     if (sel) sel.value = savedRoundLimit;
   }
+  // Restore saved turn timer
+  const savedTurnTimer = localStorage.getItem("bgame_turnTimer") || "0";
+  const timerRadio = document.querySelector(`input[name="uiTurnTimer"][value="${savedTurnTimer}"]`);
+  if (timerRadio) timerRadio.checked = true;
+  // Save turn timer on change
+  document.querySelectorAll('input[name="uiTurnTimer"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      localStorage.setItem("bgame_turnTimer", radio.value);
+    });
+  });
+  // Populate seed selection grid
+  renderSeedGrid();
   ui.setupForm.addEventListener("submit", handleSetupSubmit);
   ui.rollButton.addEventListener("click", handleRoll);
   ui.buyButton.addEventListener("click", handleBuyAction);
@@ -495,7 +602,6 @@ function initialize() {
     renderLobby("home");
   });
   document.addEventListener("keydown", handleHotkeys);
-  primeAudio();
   exposeDebugHooks();
   render();
 }
@@ -621,40 +727,164 @@ function isTypingTarget(target) {
 function renderPlayerFields(count) {
   ui.playerFields.innerHTML = "";
 
+  const savedAI = JSON.parse(localStorage.getItem("bgame_aiFlags") || "[]");
+
   for (let index = 0; index < count; index += 1) {
     const defaultColorIndex = index % COLOR_PALETTE.length;
+    const defaultCharId = CHARACTER_DEFS[index % CHARACTER_DEFS.length].id;
+    const ch = getCharacter(defaultCharId);
+    const isAI = savedAI[index] === "1";
+    const playerName = isAI ? AI_NAMES[index % AI_NAMES.length] : `Investor ${index + 1}`;
     const wrapper = document.createElement("div");
     wrapper.className = "player-field-row";
     wrapper.dataset.selectedColor = defaultColorIndex;
-    wrapper.dataset.isAi = "0";
+    wrapper.dataset.isAi = isAI ? "1" : "0";
+    wrapper.dataset.characterId = defaultCharId;
     wrapper.innerHTML = `
-      <div class="player-field-header">
-        <span class="player-field-num" style="background:${COLOR_PALETTE[defaultColorIndex].color}; color:#07131e;">P${index + 1}</span>
-        <input
-          type="text"
-          name="player-${index}"
-          maxlength="18"
-          value="Investor ${index + 1}"
-          autocomplete="off"
-          class="player-name-input"
-        />
-        <button type="button" class="ai-toggle-btn" data-player-index="${index}" onclick="toggleAIPlayer(this)">🤖 AI</button>
+      <div class="player-field-left">
+        <div class="player-field-header">
+          <span class="player-field-num" style="background:${COLOR_PALETTE[defaultColorIndex].color}; color:#07131e;">P${index + 1}</span>
+          <input
+            type="text"
+            name="player-${index}"
+            maxlength="18"
+            value="${playerName}"
+            autocomplete="off"
+            class="player-name-input"
+            ${isAI ? "disabled" : ""}
+          />
+        </div>
+        <div class="player-field-bottom">
+          <button type="button" class="ai-toggle-btn ${isAI ? "active" : ""}" data-player-index="${index}" onclick="toggleAIPlayer(this)">🤖 AI</button>
+          <div class="color-swatch-row">
+            ${COLOR_PALETTE.map((c, ci) => `
+              <button type="button" class="color-swatch ${ci === defaultColorIndex ? "selected" : ""}"
+                data-color-index="${ci}"
+                style="background:${c.color};"
+                title="${c.label}"
+              ></button>
+            `).join("")}
+          </div>
+        </div>
       </div>
-      <div class="color-swatch-row">
-        ${COLOR_PALETTE.map((c, ci) => `
-          <button type="button" class="color-swatch ${ci === defaultColorIndex ? "selected" : ""}"
-            data-color-index="${ci}"
-            style="background:${c.color};"
-            title="${c.label}"
-          ></button>
-        `).join("")}
-      </div>
+      <button type="button" class="char-card-btn" data-player-index="${index}" onclick="openCharSelect(${index})">
+        <span class="char-card-label">${ch.icon} ${ch.name}</span>
+        <img src="${ch.portrait}" class="char-card-img" alt="${ch.name}">
+      </button>
     `;
     ui.playerFields.append(wrapper);
   }
 
   attachSwatchListeners();
 }
+
+// ── Character Selection Popup ──────────────────────────────────────────
+function openCharSelect(playerIndex) {
+  const rows = Array.from(ui.playerFields.querySelectorAll(".player-field-row"));
+  const taken = rows.map((r, i) => i !== playerIndex ? r.dataset.characterId : null).filter(Boolean);
+  const currentCharId = rows[playerIndex].dataset.characterId;
+
+  let modal = document.getElementById("charSelectModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "charSelectModal";
+    modal.className = "char-select-modal hidden";
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="char-select-backdrop" onclick="closeCharSelect()"></div>
+    <div class="char-select-panel">
+      <div class="char-select-title">Select Character <span class="char-select-close" onclick="closeCharSelect()">✕</span></div>
+      <div class="char-select-grid">
+        ${CHARACTER_DEFS.map(ch => {
+          const isTaken = taken.includes(ch.id);
+          const isActive = ch.id === currentCharId;
+          return `
+            <button type="button" class="char-select-card ${isActive ? "active" : ""} ${isTaken ? "taken" : ""}"
+              data-char-id="${ch.id}" ${isTaken ? "disabled" : ""} onclick="pickCharacter(${playerIndex}, '${ch.id}')">
+              <img src="${ch.portrait}" class="char-select-portrait" alt="${ch.name}">
+              <div class="char-select-info">
+                <span class="char-select-name">${ch.icon} ${ch.name}</span>
+                <span class="char-select-title-text">${ch.title}</span>
+                <span class="char-select-passive">⚡ ${ch.passive.name}</span>
+                <span class="char-select-desc">${ch.passive.desc}</span>
+              </div>
+            </button>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+  modal.classList.remove("hidden");
+}
+
+function pickCharacter(playerIndex, charId) {
+  const rows = Array.from(ui.playerFields.querySelectorAll(".player-field-row"));
+  const row = rows[playerIndex];
+  row.dataset.characterId = charId;
+  const ch = getCharacter(charId);
+  const btn = row.querySelector(".char-card-btn");
+  btn.querySelector(".char-card-img").src = ch.portrait;
+  btn.querySelector(".char-card-label").textContent = `${ch.icon} ${ch.name}`;
+  closeCharSelect();
+}
+
+function closeCharSelect() {
+  const modal = document.getElementById("charSelectModal");
+  if (modal) modal.classList.add("hidden");
+}
+// Lobby character select — reuses the same popup
+function openLobbyCharSelect() {
+  let modal = document.getElementById("charSelectModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "charSelectModal";
+    modal.className = "char-select-modal hidden";
+    document.body.appendChild(modal);
+  }
+  const currentCharId = lobbyState.characterId;
+  modal.innerHTML = `
+    <div class="char-select-backdrop" onclick="closeCharSelect()"></div>
+    <div class="char-select-panel">
+      <div class="char-select-title">Select Character <span class="char-select-close" onclick="closeCharSelect()">✕</span></div>
+      <div class="char-select-grid">
+        ${CHARACTER_DEFS.map(ch => {
+          const isActive = ch.id === currentCharId;
+          return `
+            <button type="button" class="char-select-card ${isActive ? "active" : ""}"
+              data-char-id="${ch.id}" onclick="pickLobbyCharacter('${ch.id}')">
+              <img src="${ch.portrait}" class="char-select-portrait" alt="${ch.name}">
+              <div class="char-select-info">
+                <span class="char-select-name">${ch.icon} ${ch.name}</span>
+                <span class="char-select-title-text">${ch.title}</span>
+                <span class="char-select-passive">⚡ ${ch.passive.name}</span>
+                <span class="char-select-desc">${ch.passive.desc}</span>
+              </div>
+            </button>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+  modal.classList.remove("hidden");
+}
+
+function pickLobbyCharacter(charId) {
+  lobbyState.characterId = charId;
+  const ch = getCharacter(charId);
+  const btn = document.getElementById("lobbyCharCardBtn");
+  if (btn) {
+    btn.querySelector(".char-card-img").src = ch.portrait;
+    btn.querySelector(".char-card-label").textContent = `${ch.icon} ${ch.name}`;
+  }
+  networkSocket?.emit("change_character", { characterId: charId });
+  closeCharSelect();
+}
+
+window.openCharSelect = openCharSelect;
+window.pickCharacter = pickCharacter;
+window.closeCharSelect = closeCharSelect;
+window.openLobbyCharSelect = openLobbyCharSelect;
+window.pickLobbyCharacter = pickLobbyCharacter;
 
 function attachSwatchListeners() {
   const allRows = Array.from(ui.playerFields.querySelectorAll(".player-field-row"));
@@ -695,6 +925,14 @@ function toggleAIPlayer(btn) {
     nameInput.value    = `Investor ${idx + 1}`;
     nameInput.disabled = false;
   }
+  // Save AI flags
+  _saveAIFlags();
+}
+
+function _saveAIFlags() {
+  const rows = Array.from(ui.playerFields.querySelectorAll(".player-field-row"));
+  const flags = rows.map(r => r.dataset.isAi === "1" ? "1" : "0");
+  localStorage.setItem("bgame_aiFlags", JSON.stringify(flags));
 }
 
 function updateSwatchTakenStates(allRows) {
@@ -716,6 +954,105 @@ function backToModeSelect() {
   ui.modeOverlay.classList.remove("hidden");
 }
 
+function renderSeedGrid() {
+  const wrap = document.getElementById("seedDropdownWrap");
+  if (!wrap) return;
+  const saved = localStorage.getItem("bgame_seedId") || "world-landmarks";
+  const trigger = document.getElementById("seedDropdownTrigger");
+  const list = document.getElementById("seedDropdownList");
+  const ddIcon = document.getElementById("seedDdIcon");
+  const ddName = document.getElementById("seedDdName");
+  const ddDesc = document.getElementById("seedDdDesc");
+
+  // Hidden select for form value
+  let seedSelect = document.getElementById("seedSelect");
+  if (!seedSelect) {
+    seedSelect = document.createElement("select");
+    seedSelect.id = "seedSelect";
+    seedSelect.className = "hidden";
+    wrap.parentElement.appendChild(seedSelect);
+  }
+  seedSelect.innerHTML = `<option value="_random">Random</option>` +
+    SEED_CATALOG.map(s => `<option value="${s.id}" ${s.id === saved ? "selected" : ""}>${s.name}</option>`).join("");
+  if (saved === "_random") seedSelect.value = "_random";
+
+  // Set initial trigger display
+  function updateTrigger(id) {
+    if (id === "_random") {
+      ddIcon.textContent = "🎲";
+      ddName.textContent = "Random Theme";
+      ddDesc.textContent = "A random theme will be selected";
+    } else {
+      const s = SEED_CATALOG.find(x => x.id === id);
+      if (s) {
+        ddIcon.textContent = s.icon;
+        ddName.textContent = s.name;
+        ddDesc.textContent = s.description;
+      }
+    }
+  }
+  updateTrigger(saved);
+
+  // Build dropdown items
+  list.innerHTML = `
+    <button type="button" class="seed-dd-item ${saved === "_random" ? "active" : ""}" data-seed-id="_random">
+      <span class="seed-dd-item-num">-</span>
+      <span class="seed-dd-item-icon">🎲</span>
+      <span class="seed-dd-item-info">
+        <span class="seed-dd-item-name">Random Theme</span>
+        <span class="seed-dd-item-desc">A random theme will be selected</span>
+      </span>
+    </button>
+    ${SEED_CATALOG.map((s, i) => `
+      <button type="button" class="seed-dd-item ${s.id === saved ? "active" : ""}" data-seed-id="${s.id}">
+        <span class="seed-dd-item-num">${i + 1}</span>
+        <span class="seed-dd-item-icon">${s.icon}</span>
+        <span class="seed-dd-item-info">
+          <span class="seed-dd-item-name">${s.name}</span>
+          <span class="seed-dd-item-desc">${s.description}</span>
+        </span>
+      </button>
+    `).join("")}
+  `;
+
+  // Move list to body so no parent overflow/z-index can clip it
+  document.body.appendChild(list);
+
+  // Toggle dropdown — position relative to trigger
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const wasHidden = list.classList.contains("hidden");
+    list.classList.toggle("hidden");
+    if (wasHidden) {
+      const r = trigger.getBoundingClientRect();
+      list.style.left = r.left + "px";
+      list.style.width = r.width + "px";
+      list.style.top = (r.bottom + 4) + "px";
+    }
+  });
+
+  // Select item — use mousedown to fire before any blur/click race
+  list.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const item = e.target.closest("[data-seed-id]");
+    if (!item) return;
+    const id = item.dataset.seedId;
+    list.querySelectorAll(".seed-dd-item").forEach(i => i.classList.remove("active"));
+    item.classList.add("active");
+    seedSelect.value = id;
+    localStorage.setItem("bgame_seedId", id);
+    activeSeedId = id;
+    updateTrigger(id);
+    list.classList.add("hidden");
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener("click", () => {
+    list.classList.add("hidden");
+  });
+}
+
 function handleSetupSubmit(event) {
   event.preventDefault();
   const count = Number(ui.playerCountSelect.value);
@@ -725,17 +1062,26 @@ function handleSetupSubmit(event) {
 
   const turnTimerSeconds = Number(document.querySelector('input[name="uiTurnTimer"]:checked')?.value ?? 0);
   const aiFlags = rows.map(row => row.dataset.isAi === "1");
+  const charIds = rows.map(row => row.dataset.characterId || CHARACTER_DEFS[0].id);
   const newRoundLimit = Number(document.getElementById("roundLimitSelect")?.value) || ROUND_LIMIT;
   activeRoundLimit = newRoundLimit;
   localStorage.setItem("bgame_roundLimit", newRoundLimit);
-  startGame(names, colorIndices, turnTimerSeconds, aiFlags);
+  const seedSelect = document.getElementById("seedSelect");
+  const selectedSeed = seedSelect?.value || activeSeedId;
+  startGame(names, colorIndices, turnTimerSeconds, aiFlags, selectedSeed, charIds);
 }
 
-function startGame(names, colorIndices = [], turnTimerSeconds = 0, aiFlags = []) {
-  resetVirtualClock();
+function startGame(names, colorIndices = [], turnTimerSeconds = 0, aiFlags = [], seedId = null, charIds = []) {
+  _diceInitialized = false;
+  // Load the selected seed (shuffle landmarks each game)
+  let chosenSeed = seedId || activeSeedId;
+  if (chosenSeed === "_random") chosenSeed = getRandomSeed().id;
+  loadSeed(chosenSeed, true);
   state.players = names.map((name, index) => {
     const paletteIndex = colorIndices[index] ?? index % COLOR_PALETTE.length;
     const style = COLOR_PALETTE[paletteIndex];
+    const charId = charIds[index] || CHARACTER_DEFS[index % CHARACTER_DEFS.length].id;
+    const character = getCharacter(charId);
     return {
     id: `player-${index}`,
     name,
@@ -750,6 +1096,8 @@ function startGame(names, colorIndices = [], turnTimerSeconds = 0, aiFlags = [])
     isAI: aiFlags[index] ?? false,
     inventory: [],
     activeEffects: [],
+    characterId: charId,
+    character,
     };
   });
   state.landmarks = createLandmarkState();
@@ -778,14 +1126,13 @@ function startGame(names, colorIndices = [], turnTimerSeconds = 0, aiFlags = [])
 
   ui.setupOverlay.classList.add("hidden");
   ui.winnerOverlay.classList.add("hidden");
-  primeAudio();
   render();
   // Defer one frame so .board-center is laid out before positioning
   requestAnimationFrame(() => {
     showRoundAnnounce(1);
     setTimeout(() => showTurnAnnounce(currentPlayer()), 2600);
     if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 5000);
-    if (currentPlayer()?.isAI) setTimeout(runAITurn, 4400);
+    if (currentPlayer()?.isAI) _scheduleAITurn(4400);
   });
 }
 
@@ -810,7 +1157,7 @@ function getTopbarEventText() {
     return `Collect ${MAJOR_VICTORY_GLOBALS} Global Landmarks or survive ${activeRoundLimit} rounds.`;
   }
 
-  return shortenText(state.log[0], 78);
+  return shortenText(state.log[0], 140);
 }
 
 function renderBoard() {
@@ -857,8 +1204,17 @@ function renderBoard() {
   ui.board.append(renderBoardCenter());
 }
 
+function _hasRealImage(landmark) {
+  // Check if this landmark has a real image (not a board-center fallback)
+  return landmark.image && !landmark.image.includes("board-center") && !landmark.image.includes("world-landmark-main");
+}
+
 function renderLandmarkTile(index, landmark, owner) {
   const tierChip = owner ? SHORT_TIER_LABELS[landmark.level] : "OPEN";
+  const hasImg = _hasRealImage(landmark);
+  const fallbackName = hasImg ? "" : `<span class="lm-fallback-name">${shortenText(landmark.name, 16)}</span>`;
+  const fallbackCity = hasImg ? "" : `<span class="lm-fallback-city">${shortenText(landmark.city, 14)}</span>`;
+  const backdropClass = hasImg ? "" : "no-image";
   return `
     <div class="space-topline ${owner ? "topline-owned" : ""}" ${owner ? `style="--owner-color:${owner.color};"` : ""}>
       ${owner
@@ -868,9 +1224,11 @@ function renderLandmarkTile(index, landmark, owner) {
       <span class="space-chip ${owner ? "topline-tier-chip" : "neutral"}">${tierChip}</span>
     </div>
     <div class="space-plaza">
-      <div class="space-img-backdrop ${owner ? `is-owned tier-${landmark.level}` : `phase-${landmark.phase.toLowerCase()}`}"
-        style="--lm-image:url('${landmark.image}'); --owner-color:${owner?.color ?? "transparent"}; --owner-glow:${owner?.glow ?? "rgba(255,255,255,0)"};"
+      <div class="space-img-backdrop ${backdropClass} ${owner ? `is-owned tier-${landmark.level}` : `phase-${landmark.phase.toLowerCase()}`}"
+        style="${hasImg ? `--lm-image:url('${landmark.image}');` : ""} --space-accent:${landmark.tone}; --owner-color:${owner?.color ?? "transparent"}; --owner-glow:${owner?.glow ?? "rgba(255,255,255,0)"};"
       >
+        ${fallbackName}
+        ${fallbackCity}
         <div class="space-corner-prices">
           <span class="space-price-tag">$${formatMoney(landmark.cost)}</span>
           <span class="space-price-tag income">$${formatMoney(getLandmarkRent(landmark))}</span>
@@ -882,256 +1240,40 @@ function renderLandmarkTile(index, landmark, owner) {
 }
 
 function renderEventTile(index, space) {
+  // Apply seed event overrides if available
+  const ov = activeSeed.eventOverrides?.[space.id] || {};
+  const badge = ov.badge || space.badge;
+  const icon = ov.icon || space.icon;
+  const subtitle = ov.subtitle || space.subtitle;
   return `
     <div class="space-topline">
-      <span class="space-chip neutral">${space.badge}</span>
+      <span class="space-chip neutral">${badge}</span>
       <span></span>
     </div>
     <div class="space-plaza event-plaza">
       <div class="event-core">
-        <span class="event-glyph">${space.icon}</span>
+        <span class="event-glyph">${icon}</span>
       </div>
       <div class="token-list">${renderTokensForSpace(index)}</div>
     </div>
     <div class="space-caption">
-      <span class="space-value-pill event">${shortenText(space.subtitle, 20)}</span>
+      <span class="space-value-pill event">${shortenText(subtitle, 20)}</span>
     </div>
   `;
-}
-
-function renderMiniatureScene(landmark, owner) {
-  if (!owner) {
-    return `
-      <div class="miniature-scene is-open phase-${landmark.phase.toLowerCase()}">
-        <div class="miniature-ring"></div>
-        <div class="miniature-plinth"></div>
-        <div class="miniature-open-lot">
-          <span class="miniature-open-marker">${landmark.miniCrest}</span>
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <div
-      class="miniature-scene is-owned tier-${landmark.level} profile-${landmark.miniProfile}"
-      style="--owner-color:${owner.color}; --owner-glow:${owner.glow};"
-    >
-      <div class="miniature-ring"></div>
-      <div class="miniature-plinth"></div>
-      <div class="miniature-model">
-        ${getMiniatureBlocks(landmark).map(renderMiniatureBlock).join("")}
-      </div>
-      <span class="miniature-plaque">${landmark.miniCrest}</span>
-      <span class="miniature-flag">${owner.marker}</span>
-    </div>
-  `;
-}
-
-function renderMiniatureBlock(block) {
-  return `
-    <span
-      class="miniature-block ${block.kind} ${block.shape ?? "slab"}"
-      style="--x:${block.x}; --w:${block.w}; --h:${block.h}; --lift:${block.lift ?? 0};"
-    ></span>
-  `;
-}
-
-function getMiniatureBlocks(landmark) {
-  const level = landmark.level;
-  switch (landmark.miniProfile) {
-    case "garden":
-      return buildGardenMini(level);
-    case "bridge":
-      return buildBridgeMini(level);
-    case "clocktower":
-      return buildClocktowerMini(level);
-    case "heritage":
-      return buildHeritageMini(level);
-    case "cathedral":
-      return buildCathedralMini(level);
-    case "statue":
-      return buildStatueMini(level);
-    case "palace":
-      return buildPalaceMini(level);
-    case "opera":
-      return buildOperaMini(level);
-    case "twinspire":
-      return buildTwinSpireMini(level);
-    case "skydeck":
-      return buildSkydeckMini(level);
-    case "skyscraper":
-      return buildSkyscraperMini(level);
-    case "spire":
-    default:
-      return buildSpireMini(level);
-  }
-}
-
-function buildGardenMini(level) {
-  const canopy = [20, 28, 34, 40][level];
-  return [
-    { kind: "stone", shape: "slab", x: 22, w: 56, h: 14, lift: 10 },
-    { kind: "marble", shape: "roof", x: 30, w: 40, h: 16 + level * 3, lift: 18 },
-    { kind: "green", shape: "round", x: 18, w: canopy, h: canopy, lift: 18 + level * 4 },
-    { kind: "green", shape: "round", x: 62 - canopy / 2, w: canopy, h: canopy, lift: 18 + level * 4 },
-    ...(level >= 2 ? [{ kind: "gold", shape: "crown", x: 43, w: 14, h: 12, lift: 42 }] : []),
-  ];
-}
-
-function buildSpireMini(level) {
-  const height = [32, 46, 62, 84][level];
-  return [
-    { kind: "stone", shape: "slab", x: 20, w: 60, h: 16, lift: 8 },
-    { kind: "glass", shape: "spire", x: 44, w: 12, h: height, lift: 18 },
-    ...(level >= 1
-      ? [
-          { kind: "glass", shape: "spire", x: 28, w: 10, h: Math.round(height * 0.48), lift: 18 },
-          { kind: "glass", shape: "spire", x: 62, w: 10, h: Math.round(height * 0.48), lift: 18 },
-        ]
-      : []),
-    ...(level >= 2 ? [{ kind: "gold", shape: "crown", x: 46, w: 8, h: 14, lift: 18 + height - 4 }] : []),
-  ];
-}
-
-function buildBridgeMini(level) {
-  const towerHeight = [28, 38, 48, 62][level];
-  return [
-    { kind: "stone", shape: "slab", x: 14, w: 72, h: 16, lift: 8 },
-    { kind: "stone", shape: "arch", x: 20, w: 16, h: towerHeight, lift: 18 },
-    { kind: "stone", shape: "arch", x: 64, w: 16, h: towerHeight, lift: 18 },
-    { kind: "gold", shape: "roof", x: 28, w: 44, h: 10 + level * 2, lift: 28 + Math.round(towerHeight * 0.35) },
-    ...(level >= 2 ? [{ kind: "glass", shape: "slab", x: 42, w: 16, h: 18, lift: 18 }] : []),
-  ];
-}
-
-function buildClocktowerMini(level) {
-  const towerHeight = [34, 46, 58, 74][level];
-  return [
-    { kind: "stone", shape: "slab", x: 18, w: 64, h: 16, lift: 8 },
-    { kind: "stone", shape: "spire", x: 42, w: 16, h: towerHeight, lift: 18 },
-    { kind: "gold", shape: "roof", x: 40, w: 20, h: 12 + level * 3, lift: 18 + towerHeight - 6 },
-    ...(level >= 2 ? [{ kind: "stone", shape: "slab", x: 24, w: 18, h: 18, lift: 18 }] : []),
-  ];
-}
-
-function buildHeritageMini(level) {
-  const midHeight = [24, 30, 36, 42][level];
-  return [
-    { kind: "stone", shape: "slab", x: 16, w: 68, h: 14, lift: 8 },
-    { kind: "stone", shape: "arch", x: 18, w: 64, h: 16 + level * 4, lift: 18 },
-    { kind: "marble", shape: "roof", x: 28, w: 44, h: midHeight, lift: 24 },
-    ...(level >= 2 ? [{ kind: "gold", shape: "dome", x: 40, w: 20, h: 16, lift: 30 + midHeight - 10 }] : []),
-  ];
-}
-
-function buildCathedralMini(level) {
-  const centerHeight = [28, 40, 52, 68][level];
-  return [
-    { kind: "stone", shape: "slab", x: 16, w: 68, h: 16, lift: 8 },
-    { kind: "stone", shape: "spire", x: 42, w: 18, h: centerHeight, lift: 18 },
-    { kind: "stone", shape: "spire", x: 26, w: 12, h: 18 + level * 8, lift: 18 },
-    { kind: "stone", shape: "spire", x: 62, w: 12, h: 18 + level * 8, lift: 18 },
-    ...(level >= 1 ? [{ kind: "gold", shape: "dome", x: 40, w: 22, h: 18, lift: 28 + Math.round(centerHeight * 0.35) }] : []),
-  ];
-}
-
-function buildStatueMini(level) {
-  const figureHeight = [28, 40, 54, 68][level];
-  return [
-    { kind: "stone", shape: "slab", x: 20, w: 60, h: 16, lift: 8 },
-    { kind: "stone", shape: "slab", x: 36, w: 28, h: 20 + level * 4, lift: 18 },
-    { kind: "gold", shape: "spire", x: 45, w: 10, h: figureHeight, lift: 24 + level * 3 },
-    ...(level >= 2 ? [{ kind: "gold", shape: "crown", x: 42, w: 16, h: 12, lift: 24 + level * 3 + figureHeight - 4 }] : []),
-  ];
-}
-
-function buildPalaceMini(level) {
-  const domeHeight = [18, 24, 30, 38][level];
-  return [
-    { kind: "stone", shape: "slab", x: 14, w: 72, h: 16, lift: 8 },
-    { kind: "marble", shape: "slab", x: 18, w: 64, h: 20 + level * 4, lift: 18 },
-    { kind: "marble", shape: "dome", x: 38, w: 24, h: domeHeight, lift: 32 + level * 3 },
-    ...(level >= 1
-      ? [
-          { kind: "marble", shape: "roof", x: 22, w: 18, h: 14, lift: 30 },
-          { kind: "marble", shape: "roof", x: 60, w: 18, h: 14, lift: 30 },
-        ]
-      : []),
-    ...(level >= 3 ? [{ kind: "gold", shape: "crown", x: 45, w: 10, h: 12, lift: 46 }] : []),
-  ];
-}
-
-function buildOperaMini(level) {
-  const shellHeight = [18, 24, 32, 40][level];
-  return [
-    { kind: "stone", shape: "slab", x: 16, w: 68, h: 16, lift: 8 },
-    { kind: "marble", shape: "shell", x: 20, w: 24, h: shellHeight, lift: 18 },
-    { kind: "marble", shape: "shell", x: 38, w: 24, h: shellHeight + 6, lift: 20 },
-    { kind: "marble", shape: "shell", x: 56, w: 24, h: shellHeight - 2, lift: 18 },
-    ...(level >= 2 ? [{ kind: "gold", shape: "slab", x: 30, w: 40, h: 10, lift: 16 }] : []),
-  ];
-}
-
-function buildTwinSpireMini(level) {
-  const height = [34, 46, 60, 76][level];
-  return [
-    { kind: "stone", shape: "slab", x: 16, w: 68, h: 16, lift: 8 },
-    { kind: "glass", shape: "spire", x: 28, w: 14, h: height, lift: 18 },
-    { kind: "glass", shape: "spire", x: 58, w: 14, h: height, lift: 18 },
-    { kind: "gold", shape: "roof", x: 36, w: 28, h: 10 + level * 2, lift: 24 + Math.round(height * 0.45) },
-    ...(level >= 3 ? [{ kind: "gold", shape: "crown", x: 31, w: 38, h: 12, lift: 18 + height - 4 }] : []),
-  ];
-}
-
-function buildSkydeckMini(level) {
-  const sideHeight = [26, 36, 46, 56][level];
-  const centerHeight = [32, 44, 58, 72][level];
-  return [
-    { kind: "stone", shape: "slab", x: 14, w: 72, h: 16, lift: 8 },
-    { kind: "glass", shape: "spire", x: 22, w: 14, h: sideHeight, lift: 18 },
-    { kind: "glass", shape: "spire", x: 43, w: 14, h: centerHeight, lift: 18 },
-    { kind: "glass", shape: "spire", x: 64, w: 14, h: sideHeight, lift: 18 },
-    { kind: "marble", shape: "roof", x: 18, w: 64, h: 10 + level * 2, lift: 26 + Math.round(sideHeight * 0.85) },
-  ];
-}
-
-function buildSkyscraperMini(level) {
-  const mainHeight = [30, 42, 56, 70][level];
-  return [
-    { kind: "stone", shape: "slab", x: 16, w: 68, h: 16, lift: 8 },
-    { kind: "glass", shape: "spire", x: 24, w: 16, h: Math.round(mainHeight * 0.65), lift: 18 },
-    { kind: "glass", shape: "spire", x: 44, w: 14, h: mainHeight, lift: 18 },
-    { kind: "glass", shape: "spire", x: 60, w: 18, h: Math.round(mainHeight * 0.82), lift: 18 },
-    ...(level >= 2 ? [{ kind: "gold", shape: "crown", x: 47, w: 8, h: 12, lift: 18 + mainHeight - 4 }] : []),
-  ];
 }
 
 function renderBoardCenter() {
   const center = document.createElement("section");
   center.className = "board-center";
   center.style.gridArea = "2 / 2 / 11 / 11";
+  // Apply seed board center image
+  const img = activeSeed.boardCenter || "assets/ui/world-landmark-main-board.png";
+  center.style.backgroundImage = `url('${img}'), linear-gradient(145deg, #0e2535, #081520)`;
+  center.style.backgroundSize = "cover";
+  center.style.backgroundPosition = "center";
+  // Show seed name and icon in the center
+  center.innerHTML = `<div class="board-center-seed-label">${activeSeed.icon} ${activeSeed.name}</div>`;
   return center;
-}
-
-function getSpotlightData(space) {
-  if (space.type === "landmark") {
-    const landmark = getLandmark(space.landmarkId);
-    const owner = getPlayerById(landmark.ownerId);
-    return {
-      eyebrow: owner ? `${owner.name} controls this ${landmark.phase.toLowerCase()} route site` : `${landmark.phase} route acquisition target`,
-      title: landmark.name,
-      body: `${landmark.city}. ${landmark.flavor}`,
-      image: landmark.image,
-    };
-  }
-
-  return {
-    eyebrow: "Event space",
-    title: space.title,
-    body: `${space.subtitle}. ${space.copy}`,
-    image: "assets/ui/world-landmark-main-board.png",
-  };
 }
 
 function renderTokensForSpace(index) {
@@ -1145,11 +1287,6 @@ function renderTokensForSpace(index) {
       `,
     )
     .join("");
-}
-
-function shortenTileName(name) {
-  const compact = name.replace("Center", "Ctr");
-  return compact.length > 22 ? `${compact.slice(0, 21).trimEnd()}…` : compact;
 }
 
 function shortenText(text, maxLength) {
@@ -1175,16 +1312,13 @@ function renderTurnPanel() {
 
   const landmarkValue = getLandmarkAssetValue(player);
   const upgradeValue = getUpgradeAssetValue(player);
-  const holdingsCount = ownedLandmarks(player.id).length;
-  const currentSpace = getSpaceTitle(getSpace(player.position));
-  const rank = rankedPlayers().findIndex((entry) => entry.id === player.id) + 1;
   const status = state.gameOver
-    ? "Final audit closed"
+    ? "Game Over"
     : state.turnBusy
-      ? "Traveling"
+      ? "Moving..."
       : state.turnStarted
-        ? "Investment window open"
-        : "Awaiting roll";
+        ? "Buy, Upgrade, or End Turn"
+        : "Ready to Roll or Item Shop";
 
   const holdings = ownedLandmarks(player.id);
 
@@ -1222,26 +1356,29 @@ function renderTurnPanel() {
       </div>
     </div>` : "";
 
+  // Status aura above dice
+  const statusEl = document.getElementById("statusAura");
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="status-aura-pill" style="--sa-color:${player.color}; --sa-glow:${player.glow};">${status}</span>`;
+    statusEl.className = "status-aura-wrap";
+    if (!state.gameOver) statusEl.classList.add("status-aura-active");
+  }
+
   ui.turnCard.innerHTML = `
     <div class="turn-brief">
       <div class="turn-brief-head">
         <p class="eyebrow">Current Investor</p>
-        <span class="turn-pill" style="--owner-color:${player.color}; --owner-glow:${player.glow};">
-          ${status}
-        </span>
       </div>
+      ${player.character ? `
+      <div class="turn-char-card" style="--player-color:${player.color}; --player-glow:${player.glow};">
+        <span class="turn-char-top">${player.name}</span>
+        <img src="${player.character.portrait}" class="turn-char-img" alt="${player.character.name}">
+        <span class="turn-char-bottom">${player.character.icon} ${player.character.name} · ⚡${player.character.passive.name}</span>
+      </div>` : `
       <div class="turn-hero">
         <span class="player-dot" style="background:${player.color}; box-shadow:0 0 16px ${player.glow};"></span>
-        <div>
-          <h2 class="current-player-name">${player.name}</h2>
-          <p class="turn-subtitle">${player.colorName} investor · rank #${rank}</p>
-        </div>
-      </div>
-      <div class="turn-brief-meta">
-        <span class="turn-meta-pill">On ${currentSpace}</span>
-        <span class="turn-meta-pill">${holdingsCount} landmarks</span>
-        <span class="turn-meta-pill">${countGlobalLandmarks(player.id)} global</span>
-      </div>
+        <h2 class="current-player-name">${player.name}</h2>
+      </div>`}
       <div class="turn-brief-grid">
         <div class="stat-block">
           <span class="stat-label">Cash</span>
@@ -1284,13 +1421,24 @@ function createDieMarkup(value, rolling) {
     6: "rotateY(180deg)",
   };
 
+  // Initial state: show a random face with slight 3D tilt
+  let transform;
+  if (!_diceInitialized && !rolling) {
+    const randomFace = Math.floor(Math.random() * 6) + 1;
+    const tiltX = -12 + Math.random() * 24;
+    const tiltZ = -10 + Math.random() * 20;
+    transform = rotations[randomFace] + ` rotateX(${tiltX}deg) rotateZ(${tiltZ}deg)`;
+  } else {
+    transform = rotations[value];
+  }
+
   const faces = [1, 2, 3, 4, 5, 6]
     .map((n) => `<div class="die-face face-${n}">${createFacePips(n)}</div>`)
     .join("");
 
   return `
     <div class="die-wrapper">
-      <div class="die-3d ${rolling ? "rolling" : ""}" style="--die-transform: ${rotations[value]};">
+      <div class="die-3d ${rolling ? "rolling" : ""}" style="--die-transform: ${transform};">
         ${faces}
       </div>
     </div>
@@ -1515,6 +1663,7 @@ function renderPlayers() {
             <span class="player-marker-chip" style="color:#07131e;">P${player.marker}</span>
             <strong class="player-card-name" style="color:#07131e;">${player.name}</strong>
           </div>
+          ${player.character ? `<div class="player-card-bg-portrait" style="background-image:url('${player.character.portrait}');"></div>` : ""}
           <div class="player-card-metrics">
             <div class="metric-asset-row">
               <span class="metric-eyebrow">Asset</span>
@@ -1539,7 +1688,7 @@ function renderPlayers() {
     })
     .join("");
 
-  ui.playersStrip.innerHTML = `<p class="panel-eyebrow">Investors</p>${cards}`;
+  ui.playersStrip.innerHTML = cards;
   attachPlayerTabListeners();
 }
 
@@ -1795,6 +1944,10 @@ function handleContextAction() {
 async function handleRoll() {
   if (gameMode === "network") {
     stopTurnTimer();
+    _diceInitialized = true;
+    state.rolling = true;
+    renderDice();
+    playSound("roll");
     networkSocket?.emit("roll_dice", { code: lobbyState.roomCode });
     return;
   }
@@ -1806,6 +1959,7 @@ async function handleRoll() {
   }
 
   unlockAudio();
+  _diceInitialized = true;
   state.turnBusy = true;
   state.rolling = true;
   render();
@@ -1828,6 +1982,10 @@ async function handleRoll() {
   render();
 
   let total = dieOne + dieTwo;
+  if (player.character?.passive?.id === "extra-move") {
+    total += player.character.passive.params.extra;
+    addLog(`${player.name}'s Extra Move passive added +${player.character.passive.params.extra} space.`);
+  }
   if (hasEffect(player, "shortcut-map")) {
     total += 3;
     consumeEffect(player, "shortcut-map");
@@ -1852,8 +2010,13 @@ async function movePlayer(player, spaces) {
     state.selectedSpaceIndex = player.position;
 
     if (player.position === 0) {
-      player.cash += PASS_START_BONUS;
-      addLog(`${player.name} passed START and collected $${formatMoney(PASS_START_BONUS)}.`);
+      let startBonus = PASS_START_BONUS;
+      if (player.character?.passive?.id === "double-or-nothing" && Math.random() < player.character.passive.params.chance) {
+        startBonus *= 2;
+        addLog(`${player.name}'s Double-or-Nothing passive doubled the START bonus!`);
+      }
+      player.cash += startBonus;
+      addLog(`${player.name} passed START and collected $${formatMoney(startBonus)}.`);
     }
 
     render();
@@ -1905,8 +2068,27 @@ async function resolveCurrentSpace(player) {
           consumeEffect(player, "insurance");
           addLog(`${player.name}'s Insurance halved the rent to $${formatMoney(rent)}.`);
         }
+        if (owner.character?.passive?.id === "rent-boost") {
+          const boost = Math.round(rent * owner.character.passive.params.boost);
+          rent += boost;
+          addLog(`${owner.name}'s Rent Boost passive added $${formatMoney(boost)} to rent.`);
+        }
+        if (owner.character?.passive?.id === "rally") {
+          const ownerBuildings = totalUpgradeCount(owner.id);
+          if (ownerBuildings >= owner.character.passive.params.threshold) {
+            const boost = Math.round(rent * owner.character.passive.params.boost);
+            rent += boost;
+            addLog(`${owner.name}'s Rally passive added $${formatMoney(boost)} rent (${ownerBuildings} buildings).`);
+          }
+        }
         transferCash(player, owner, rent, `${landmark.name} income`);
         playSound("rent");
+        requestAnimationFrame(() => fxRentPayment(player, owner, player.position, rent));
+        if (player.character?.passive?.id === "intel") {
+          const cashback = Math.round(rent * player.character.passive.params.cashback);
+          player.cash += cashback;
+          addLog(`${player.name}'s Intel passive returned $${formatMoney(cashback)} cashback on rent.`);
+        }
       }
     }
   }
@@ -1916,20 +2098,33 @@ async function resolveCurrentSpace(player) {
 
 async function resolveEvent(player, space) {
   switch (space.eventType) {
-    case "start":
-      player.cash += EXACT_START_BONUS;
-      addLog(`${player.name} landed exactly on START and banked $${formatMoney(EXACT_START_BONUS)}.`);
+    case "start": {
+      let exactBonus = EXACT_START_BONUS;
+      if (player.character?.passive?.id === "double-or-nothing" && Math.random() < player.character.passive.params.chance) {
+        exactBonus *= 2;
+        addLog(`${player.name}'s Double-or-Nothing passive doubled the START landing bonus!`);
+      }
+      player.cash += exactBonus;
+      addLog(`${player.name} landed exactly on START and banked $${formatMoney(exactBonus)}.`);
       checkForEndConditions("start-bonus");
+      requestAnimationFrame(() => fxBonusGain(player, player.position, exactBonus));
       return false;
+    }
 
     case "corner-tax": {
       if (hasEffect(player, "tax-shield")) {
         consumeEffect(player, "tax-shield");
         addLog(`${player.name}'s Tax Shield absorbed the city tax.`);
       } else {
-        const loss = 150;
+        let loss = 150;
+        if (player.character?.passive?.id === "tax-shield") {
+          const reduction = Math.round(loss * player.character.passive.params.reduction);
+          loss -= reduction;
+          addLog(`${player.name}'s Tax Shield passive reduced tax by $${formatMoney(reduction)}.`);
+        }
         playSound("tax");
         applyCharge(player, loss, "city tax");
+        requestAnimationFrame(() => fxTaxCharge(player, player.position, loss));
       }
       checkForEndConditions("corner-tax");
       return false;
@@ -1941,13 +2136,7 @@ async function resolveEvent(player, space) {
       playSound("bonus");
       addLog(`${player.name} capitalized on a Tourism Boom for $${formatMoney(payout)}.`);
       checkForEndConditions("tourism-boom");
-      return false;
-    }
-
-    case "currency-shock": {
-      const loss = 90 + totalUpgradeCount(player.id) * 18;
-      applyCharge(player, loss, "currency shock");
-      checkForEndConditions("currency-shock");
+      requestAnimationFrame(() => fxBonusGain(player, player.position, payout));
       return false;
     }
 
@@ -1963,13 +2152,7 @@ async function resolveEvent(player, space) {
       player.cash += payout;
       addLog(`${player.name} received a Heritage Grant worth $${formatMoney(payout)}.`);
       checkForEndConditions("heritage-grant");
-      return false;
-    }
-
-    case "zoning-audit": {
-      const loss = 110 + ownedLandmarks(player.id).length * 20;
-      applyCharge(player, loss, "zoning audit");
-      checkForEndConditions("zoning-audit");
+      requestAnimationFrame(() => fxBonusGain(player, player.position, payout));
       return false;
     }
 
@@ -1985,6 +2168,7 @@ async function resolveEvent(player, space) {
       player.cash += payout;
       addLog(`${player.name} captured $${formatMoney(payout)} from the Tourism Boom crowd surge.`);
       checkForEndConditions("media-spotlight");
+      requestAnimationFrame(() => fxBonusGain(player, player.position, payout));
       return false;
     }
 
@@ -1999,24 +2183,25 @@ async function resolveEvent(player, space) {
       player.cash += payout;
       addLog(`${player.name} pulled into Free Parking and collected $${formatMoney(payout)}.`);
       checkForEndConditions("free-parking");
-      return false;
-    }
-
-    case "market-summit": {
-      const payout = 140 + countGlobalLandmarks(player.id) * 80;
-      player.cash += payout;
-      addLog(`${player.name} raised $${formatMoney(payout)} at the Market Summit.`);
-      checkForEndConditions("market-summit");
+      requestAnimationFrame(() => fxBonusGain(player, player.position, payout));
       return false;
     }
 
     case "world-event": {
-      const roll = Math.floor(Math.random() * 3);
+      let roll = Math.floor(Math.random() * 3);
+      if (player.character?.passive?.id === "foresight" && roll !== 0) {
+        const reroll = Math.floor(Math.random() * 3);
+        if (reroll === 0) {
+          roll = 0;
+          addLog(`${player.name}'s Foresight passive shifted the World Event to a bonus outcome!`);
+        }
+      }
       if (roll === 0) {
         const payout = 140 + ownedLandmarks(player.id).length * 30;
         player.cash += payout;
         addLog(`${player.name} hit a favorable World Event and gained $${formatMoney(payout)}.`);
         checkForEndConditions("world-event-bonus");
+        requestAnimationFrame(() => fxBonusGain(player, player.position, payout));
         return false;
       }
 
@@ -2024,6 +2209,7 @@ async function resolveEvent(player, space) {
         const loss = 110 + totalUpgradeCount(player.id) * 18;
         applyCharge(player, loss, "world event shock");
         checkForEndConditions("world-event-tax");
+        requestAnimationFrame(() => fxTaxCharge(player, player.position, loss));
         return false;
       }
 
@@ -2034,9 +2220,15 @@ async function resolveEvent(player, space) {
     }
 
     case "restoration-bill": {
-      const loss = 70 + Math.round(getUpgradeAssetValue(player) * 0.15);
+      let loss = 70 + Math.round(getUpgradeAssetValue(player) * 0.15);
+      if (player.character?.passive?.id === "tax-shield") {
+        const reduction = Math.round(loss * player.character.passive.params.reduction);
+        loss -= reduction;
+        addLog(`${player.name}'s Tax Shield passive reduced restoration bill by $${formatMoney(reduction)}.`);
+      }
       applyCharge(player, loss, "restoration bill");
       checkForEndConditions("restoration-bill");
+      requestAnimationFrame(() => fxTaxCharge(player, player.position, loss));
       return false;
     }
 
@@ -2106,6 +2298,10 @@ function buyLandmark(landmarkId) {
 
   unlockAudio();
   let cost = landmark.cost;
+  if (player.character?.passive?.id === "land-discount") {
+    cost = Math.round(cost * (1 - player.character.passive.params.discount));
+    addLog(`${player.name}'s Land Discount passive saved 10% on purchase.`);
+  }
   if (hasEffect(player, "discount-deed")) {
     cost = Math.round(cost * 0.7);
     consumeEffect(player, "discount-deed");
@@ -2115,11 +2311,16 @@ function buyLandmark(landmarkId) {
   if (player.cash < 0) { player.cash = 0; }
   landmark.ownerId = player.id;
   landmark.level = 0;
+  if (player.character?.passive?.id === "fast-build" && landmark.level === 0) {
+    landmark.level = 1;
+    addLog(`${player.name}'s Fast Build passive auto-upgraded ${landmark.name} to ${UPGRADE_LEVELS[1]} for free!`);
+  }
   state.pendingAction = null;
   playSound("buy");
   addLog(`${player.name} acquired ${landmark.name} for $${formatMoney(landmark.cost)}.`);
   checkForEndConditions("purchase");
   render();
+  requestAnimationFrame(() => fxBuyLandmark(player, player.position, cost));
 }
 
 function handleUpgrade(landmarkId) {
@@ -2140,7 +2341,12 @@ function handleUpgrade(landmarkId) {
   }
 
   unlockAudio();
-  player.cash -= landmark.upgradeCost;
+  let upgCost = landmark.upgradeCost;
+  if (player.character?.passive?.id === "upgrade-discount") {
+    upgCost = Math.round(upgCost * (1 - player.character.passive.params.discount));
+    addLog(`${player.name}'s Upgrade Discount passive saved 15% on the upgrade.`);
+  }
+  player.cash -= upgCost;
   landmark.level += 1;
   if (state.pendingAction?.landmarkId === landmark.id) {
     state.pendingAction = null;
@@ -2151,6 +2357,7 @@ function handleUpgrade(landmarkId) {
   );
   checkForEndConditions("upgrade");
   render();
+  requestAnimationFrame(() => fxUpgradeLandmark(player, player.position, landmark.upgradeCost));
 }
 
 function handleEndTurn() {
@@ -2177,7 +2384,7 @@ function handleEndTurn() {
     state.turnStarted = false;
     state.shopStock = generateShopStock();
     render();
-    if (player.isAI) setTimeout(runAITurn, 1200);
+    if (player.isAI) _scheduleAITurn(1200);
     return;
   }
 
@@ -2212,22 +2419,31 @@ function handleEndTurn() {
     state.shopStock = generateShopStock();
     if (wrapped) {
       state.round += 1;
+      state.players.forEach((p) => {
+        if (!p.bankrupt && p.character?.passive?.id === "interest") {
+          const interest = Math.round(p.cash * p.character.passive.params.rate);
+          if (interest > 0) {
+            p.cash += interest;
+            addLog(`${p.name}'s Interest passive earned $${formatMoney(interest)} at round start.`);
+          }
+        }
+      });
     }
 
     if (state.round > activeRoundLimit) {
       endGame("round-limit");
     } else {
       addLog(`${currentPlayer().name} is now at the table.`);
-      render();
+      // Delay render so right panel switches with the turn announce
       if (wrapped) {
-        showRoundAnnounce(state.round);
-        setTimeout(() => showTurnAnnounce(currentPlayer()), 2600);
-        if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 5000);
-        if (currentPlayer().isAI) setTimeout(runAITurn, 4400);
+        setTimeout(() => showRoundAnnounce(state.round), 1500);
+        setTimeout(() => { render(); showTurnAnnounce(currentPlayer()); }, 4500);
+        if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 7000);
+        if (currentPlayer().isAI) _scheduleAITurn(6000);
       } else {
-        showTurnAnnounce(currentPlayer());
-        if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 2400);
-        if (currentPlayer().isAI) setTimeout(runAITurn, 1800);
+        setTimeout(() => { render(); showTurnAnnounce(currentPlayer()); }, 1800);
+        if (state.turnTimerSeconds > 0) setTimeout(() => startTurnTimer(state.turnTimerSeconds), 4200);
+        if (currentPlayer().isAI) _scheduleAITurn(3500);
       }
     }
     return;
@@ -2335,8 +2551,8 @@ function renderWinnerOverlay() {
     <p class="winner-summary">Final ranking uses total assets only: cash + landmark value + upgrade value.</p>
     <div class="winner-actions">
       <button class="primary-button" id="playAgainButton" type="button">Play Again</button>
-      <button class="secondary-button" id="prevMenuButton" type="button">이전 메뉴</button>
-      <button class="secondary-button" id="homeScreenButton" type="button">첫 화면</button>
+      <button class="secondary-button" id="prevMenuButton" type="button">Back to Setup</button>
+      <button class="secondary-button" id="homeScreenButton" type="button">Game Mode Select</button>
     </div>
   `;
 
@@ -2379,8 +2595,9 @@ function renderRankingRow(player, index) {
   return `
     <div class="ranking-row ${index === 0 ? "is-top" : ""}">
       <strong>${index + 1}</strong>
+      ${player.character?.portrait ? `<img src="${player.character.portrait}" class="winner-portrait" alt="">` : ""}
       <div class="ranking-main">
-        <div class="ranking-name">${player.name}</div>
+        <div class="ranking-name">${player.name}${player.character ? ` <small style="opacity:0.7;">${player.character.name}</small>` : ""}</div>
         <div class="ranking-detail">
           Cash $${formatMoney(player.cash)} · Landmarks $${formatMoney(getLandmarkAssetValue(player))} · Upgrades $${formatMoney(getUpgradeAssetValue(player))}
         </div>
@@ -2537,16 +2754,10 @@ function getEventPreview(space, player) {
   switch (space.eventType) {
     case "tourism-boom":
       return `Now: +$${formatMoney(120 + ownedLandmarks(player.id).length * 25)}`;
-    case "currency-shock":
-      return `Now: -$${formatMoney(90 + totalUpgradeCount(player.id) * 18)}`;
     case "heritage-grant":
       return `Now: +$${formatMoney(80 + countDevelopedOrBetter(player.id) * 45)}`;
-    case "zoning-audit":
-      return `Now: -$${formatMoney(110 + ownedLandmarks(player.id).length * 20)}`;
     case "media-spotlight":
       return `Now: +$${formatMoney(100 + Math.round(highestOwnedRent(player.id) * 0.75))}`;
-    case "market-summit":
-      return `Now: +$${formatMoney(140 + countGlobalLandmarks(player.id) * 80)}`;
     case "restoration-bill":
       return `Now: -$${formatMoney(70 + Math.round(getUpgradeAssetValue(player) * 0.15))}`;
     default:
@@ -2571,61 +2782,7 @@ function randomDie() {
 }
 
 function delay(ms) {
-  return new Promise((resolve) => {
-    const timer = {
-      due: virtualClock.now + ms,
-      done: false,
-      resolve,
-      realId: null,
-    };
-
-    timer.realId = window.setTimeout(() => {
-      completeVirtualTimer(timer);
-    }, ms);
-
-    virtualClock.timers.push(timer);
-  });
-}
-
-function completeVirtualTimer(timer) {
-  if (!timer || timer.done) {
-    return;
-  }
-
-  timer.done = true;
-  if (timer.realId !== null) {
-    window.clearTimeout(timer.realId);
-  }
-
-  const index = virtualClock.timers.indexOf(timer);
-  if (index >= 0) {
-    virtualClock.timers.splice(index, 1);
-  }
-
-  timer.resolve();
-}
-
-async function advanceTime(ms) {
-  virtualClock.now += ms;
-
-  virtualClock.timers
-    .filter((timer) => !timer.done && timer.due <= virtualClock.now)
-    .sort((left, right) => left.due - right.due)
-    .forEach(completeVirtualTimer);
-
-  await Promise.resolve();
-  await Promise.resolve();
-  render();
-}
-
-function resetVirtualClock() {
-  virtualClock.now = 0;
-  virtualClock.timers.forEach((timer) => {
-    if (timer.realId !== null) {
-      window.clearTimeout(timer.realId);
-    }
-  });
-  virtualClock.timers = [];
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Turn announce + countdown positioning ─────────────────────────────────
@@ -2649,18 +2806,72 @@ function showTurnAnnounce(player) {
   el.innerHTML = `
     <div class="turn-announce-inner" style="--player-color:${color};--player-glow:${glow};">
       <div class="turn-announce-aura"></div>
+      ${player.character?.portrait ? `<img src="${player.character.portrait}" class="turn-announce-portrait" alt="">` : ""}
       <span class="turn-announce-name" style="color:${color};">${player.name}${aiTag}</span>
+      ${player.character ? `<span style="font-size:0.7em;opacity:0.8;color:${color};">${player.character.name}</span>` : ""}
       <span class="turn-announce-label">Your Turn!</span>
     </div>`;
-  _positionOnBoard("turnAnnounce");
-  el.classList.remove("hidden", "turn-announce-exit");
+
+  // Get player panel position as start point
+  const panelEl = _getPlayerPanelEl(player.id);
+  const boardCenter = document.querySelector(".board-center");
+
+  el.classList.remove("hidden", "turn-announce-exit", "turn-announce-enter");
+  el.style.position = "fixed";
+  el.style.zIndex = "9000";
+  el.style.transition = "none";
+  el.style.pointerEvents = "none";
+
+  if (panelEl && boardCenter) {
+    const from = panelEl.getBoundingClientRect();
+    const to = boardCenter.getBoundingClientRect();
+    const startX = from.left + from.width / 2;
+    const startY = from.top + from.height / 2;
+    const endX = to.left + to.width / 2;
+    const endY = to.top + to.height / 2;
+
+    // Animate: fly from player panel to board center
+    el.style.left = startX + "px";
+    el.style.top = startY + "px";
+    el.style.transform = "translate(-50%,-50%) scale(0.3)";
+    el.style.opacity = "0";
+
+    requestAnimationFrame(() => {
+      el.style.transition = "all 0.6s cubic-bezier(0.22, 1, 0.36, 1)";
+      el.style.left = endX + "px";
+      el.style.top = endY + "px";
+      el.style.transform = "translate(-50%,-50%) scale(1)";
+      el.style.opacity = "1";
+    });
+  } else {
+    _positionOnBoard("turnAnnounce");
+    el.style.opacity = "1";
+  }
+
   el.classList.add("turn-announce-enter");
   playSound("turn_start");
   if (_announceTimer) clearTimeout(_announceTimer);
   _announceTimer = setTimeout(() => {
     el.classList.remove("turn-announce-enter");
     el.classList.add("turn-announce-exit");
-    setTimeout(() => el.classList.add("hidden"), 580);
+    // Fly to right panel (turnCard)
+    const turnCard = document.getElementById("turnCard");
+    if (turnCard) {
+      const dest = turnCard.getBoundingClientRect();
+      el.style.transition = "left 1s ease-in, top 1s ease-in, transform 1s ease-in, opacity 0.3s ease-in 0.7s";
+      el.style.left = (dest.left + dest.width / 2) + "px";
+      el.style.top = (dest.top + dest.height / 2) + "px";
+      el.style.transform = "translate(-50%,-50%) scale(0.15)";
+      el.style.opacity = "0";
+    } else {
+      el.style.transition = "opacity 0.5s ease-out";
+      el.style.opacity = "0";
+    }
+    setTimeout(() => {
+      el.classList.add("hidden");
+      el.style.transition = "";
+      el.style.opacity = "";
+    }, 1100);
   }, 2100);
 }
 
@@ -2790,6 +3001,413 @@ function showFireworks(duration = 3600, onComplete) {
   requestAnimationFrame(frame);
 }
 
+// ── Money particle effects system ─────────────────────────────────────────
+function _getElCenter(el) {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+function _getPlayerPanelEl(playerId) {
+  return document.querySelector(`.player-card[data-player-id="${playerId}"]`);
+}
+
+function _getBoardTileEl(spaceIndex) {
+  const tiles = document.querySelectorAll("#board .space");
+  return tiles[spaceIndex] ?? null;
+}
+
+const MONEY_SYMBOLS = ["$", "💵", "💰", "🪙", "💲"];
+
+function spawnMoneyParticles(fromEl, toEl, count, color, opts = {}) {
+  const from = _getElCenter(fromEl);
+  const to   = _getElCenter(toEl);
+  if (!from || !to) { opts.onComplete?.(); return; }
+
+  const container = document.createElement("div");
+  container.className = "money-fx-container";
+  document.body.appendChild(container);
+
+  const duration = opts.duration || 1000;
+  let completed = 0;
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("div");
+    p.className = "money-particle";
+    // Randomize between $ and emoji symbols for variety
+    p.textContent = opts.symbol || MONEY_SYMBOLS[Math.floor(Math.random() * MONEY_SYMBOLS.length)];
+    p.style.color = color;
+
+    // Random spawn offset from center (spread the origin)
+    const spawnSpreadX = (Math.random() - 0.5) * 40;
+    const spawnSpreadY = (Math.random() - 0.5) * 30;
+    p.style.left = `${from.x + spawnSpreadX}px`;
+    p.style.top  = `${from.y + spawnSpreadY}px`;
+
+    // Random size variation: 1.0x to 2.2x
+    const scale = 1 + Math.random() * 1.2;
+    p.style.setProperty("--fx-scale", scale.toFixed(2));
+
+    // Staggered delay with some randomness
+    const delay = i * (duration / count / 2) + Math.random() * 60;
+    p.style.animationDuration = `${duration + Math.random() * 200}ms`;
+    p.style.animationDelay = `${delay}ms`;
+
+    // Wide curved bezier path with big random arcs
+    const cpxOff = (Math.random() - 0.5) * 240;
+    const cpyOff = -60 - Math.random() * 140;
+    const dx = to.x - from.x - spawnSpreadX;
+    const dy = to.y - from.y - spawnSpreadY;
+
+    p.style.setProperty("--fx-dx", `${dx}px`);
+    p.style.setProperty("--fx-dy", `${dy}px`);
+    p.style.setProperty("--fx-cpx", `${dx * 0.4 + cpxOff}px`);
+    p.style.setProperty("--fx-cpy", `${dy * 0.4 + cpyOff}px`);
+
+    // Random rotation
+    p.style.setProperty("--fx-rot", `${(Math.random() - 0.5) * 360}deg`);
+
+    container.appendChild(p);
+
+    const totalDelay = delay + duration + 200;
+    setTimeout(() => {
+      p.remove();
+      completed++;
+      if (completed >= count) {
+        container.remove();
+        opts.onComplete?.();
+      }
+    }, totalDelay + 50);
+  }
+}
+
+// ── Phase / Level celebration config ──────────────────────────────────────
+const PHASE_FX = {
+  early: {
+    colors: ["#6bcb77", "#b5e85a", "#4dd9d0", "#2ec4b6", "#7ad977", "#a8e06c"],
+    shapes: ["✦", "●", "◆", "★", "♠"],
+    ringColor: "rgba(107,203,119,0.5)",
+    sound: "celebrate_early",
+  },
+  mid: {
+    colors: ["#ffd93d", "#ffbe0b", "#ffad63", "#f5c842", "#efc77b", "#fb5607"],
+    shapes: ["★", "◆", "■", "●", "✦", "♦", "▲"],
+    ringColor: "rgba(255,217,61,0.5)",
+    sound: "celebrate_mid",
+  },
+  late: {
+    colors: ["#b487ff", "#f72585", "#4d96ff", "#ffd93d", "#c77dff", "#ff6b6b", "#2ec4b6"],
+    shapes: ["★", "◆", "✦", "♦", "●", "■", "▲", "♠", "♥"],
+    ringColor: "rgba(180,135,255,0.5)",
+    sound: "celebrate_late",
+  },
+};
+
+// Level multipliers: 0=2x, 1=3x, 2=4.5x, 3=6.75x
+const LEVEL_MULTIPLIERS = [2, 3, 4.5, 6.75];
+
+function showConfettiShower(spaceIndex, playerColor, phase, level) {
+  const tile = _getBoardTileEl(spaceIndex);
+  if (!tile) return;
+  const tileRect = tile.getBoundingClientRect();
+  const cx = tileRect.left + tileRect.width / 2;
+  const cy = tileRect.top;
+
+  const container = document.createElement("div");
+  container.className = "money-fx-container";
+  document.body.appendChild(container);
+
+  const phaseKey = (phase || "early").toLowerCase();
+  const fx = PHASE_FX[phaseKey] || PHASE_FX.early;
+  const mult = LEVEL_MULTIPLIERS[level ?? 0] || 2;
+  const allColors = [playerColor, ...fx.colors];
+
+  // Confetti count scales with multiplier: base 50 × mult
+  const confettiCount = Math.round(50 * mult);
+  // Spread range scales too
+  const spreadX = 120 + mult * 30;
+  const spreadY = 140 + mult * 30;
+
+  for (let i = 0; i < confettiCount; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti-piece";
+    c.textContent = fx.shapes[Math.floor(Math.random() * fx.shapes.length)];
+    c.style.color = allColors[Math.floor(Math.random() * allColors.length)];
+    c.style.left = `${cx + (Math.random() - 0.5) * spreadX}px`;
+    c.style.top  = `${cy - 20 - Math.random() * 50}px`;
+    c.style.setProperty("--confetti-dx", `${(Math.random() - 0.5) * spreadX * 1.5}px`);
+    c.style.setProperty("--confetti-dy", `${60 + Math.random() * spreadY}px`);
+    c.style.setProperty("--confetti-rot", `${Math.random() * 720 - 360}deg`);
+    const baseScale = 0.5 + Math.random() * 0.7 + (level ?? 0) * 0.15;
+    c.style.setProperty("--confetti-scale", baseScale.toFixed(2));
+    c.style.animationDelay = `${Math.random() * 500}ms`;
+    c.style.animationDuration = `${1800 + Math.random() * 600 + (level ?? 0) * 200}ms`;
+    container.appendChild(c);
+  }
+
+  // Ring burst for Mid/Late phases
+  if (phaseKey === "mid" || phaseKey === "late") {
+    const ring = document.createElement("div");
+    ring.className = `celebrate-ring celebrate-ring-${phaseKey}`;
+    ring.style.left = `${cx}px`;
+    ring.style.top  = `${tileRect.top + tileRect.height / 2}px`;
+    ring.style.setProperty("--ring-size", `${60 + mult * 20}px`);
+    ring.style.setProperty("--ring-color", fx.ringColor);
+    container.appendChild(ring);
+  }
+
+  // Screen flash for Late phase at level 2+
+  if (phaseKey === "late" && (level ?? 0) >= 2) {
+    const flash = document.createElement("div");
+    flash.className = "screen-flash";
+    container.appendChild(flash);
+  }
+
+  setTimeout(() => container.remove(), 3000 + (level ?? 0) * 300);
+}
+
+// Phase-aware celebration with sounds
+function showPhaseCelebration(spaceIndex, playerColor, phase, level) {
+  const phaseKey = (phase || "early").toLowerCase();
+  const fx = PHASE_FX[phaseKey] || PHASE_FX.early;
+  const lvl = level ?? 0;
+
+  // Phase-specific base sound
+  playSound(fx.sound);
+
+  // Additional sounds for higher levels
+  if (lvl >= 1) playSound("coins_shower");
+  if (lvl >= 2) playSound("fanfare");
+  if (lvl >= 3) {
+    playSound("grand_fanfare");
+    playSound("impact");
+  }
+
+  // Tile celebration glow
+  showTileCelebration(spaceIndex, fx.colors[0]);
+
+  // Confetti shower
+  showConfettiShower(spaceIndex, playerColor, phase, lvl);
+}
+
+function showTileCelebration(spaceIndex, color) {
+  const tile = _getBoardTileEl(spaceIndex);
+  if (!tile) return;
+  tile.classList.add("tile-celebrate");
+  tile.style.setProperty("--celebrate-color", color);
+  playSound("sparkle");
+  setTimeout(() => tile.classList.remove("tile-celebrate"), 1800);
+}
+
+function showCashPopup(el, amount, positive) {
+  if (!el) return;
+  const popup = document.createElement("div");
+  popup.className = `cash-popup ${positive ? "cash-popup-plus" : "cash-popup-minus"}`;
+  popup.textContent = `${positive ? "+" : "-"}$${formatMoney(Math.abs(amount))}`;
+  const r = el.getBoundingClientRect();
+  popup.style.left = `${r.left + r.width / 2}px`;
+  popup.style.top  = `${r.top}px`;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.remove(), 1600);
+}
+
+function flashPanel(playerId, color, type) {
+  const panel = _getPlayerPanelEl(playerId);
+  if (!panel) return;
+  panel.classList.add(`panel-flash-${type}`);
+  panel.style.setProperty("--flash-color", color);
+  setTimeout(() => panel.classList.remove(`panel-flash-${type}`), 1000);
+}
+
+// ── Orchestrated money effects ────────────────────────────────────────────
+
+function fxBuyLandmark(player, spaceIndex, cost) {
+  const panelEl = _getPlayerPanelEl(player.id);
+  const tileEl  = _getBoardTileEl(spaceIndex);
+  const space = SPACE_DEFS[spaceIndex];
+  const landmark = space?.type === "landmark" ? getLandmark(space.landmarkId) : null;
+  const phase = landmark?.phase || "Early";
+
+  playSound("cash_fly");
+  flashPanel(player.id, "#ff6b6b", "out");
+  showCashPopup(panelEl, cost, false);
+  spawnMoneyParticles(panelEl, tileEl, 18, "#ffd93d", {
+    duration: 1000,
+    onComplete() {
+      if (player.character) {
+        _flyCharCard(player, panelEl, tileEl, () => {
+          showPhaseCelebration(spaceIndex, player.color, phase, 0);
+        });
+      } else {
+        showPhaseCelebration(spaceIndex, player.color, phase, 0);
+      }
+    }
+  });
+}
+
+function _flyCharCard(player, fromEl, toEl, onDone) {
+  const fromR = fromEl.getBoundingClientRect();
+  const toR = toEl.getBoundingClientRect();
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+
+  const card = document.createElement("div");
+  card.className = "flying-char-card";
+  card.innerHTML = `
+    <img src="${player.character.portrait}" class="flying-char-img">
+    <span class="flying-char-name">${player.character.icon} ${player.character.name}</span>
+  `;
+  document.body.appendChild(card);
+
+  const startX = fromR.right - 20;
+  const startY = fromR.top + fromR.height / 2;
+  const endX = toR.left + toR.width / 2;
+  const endY = toR.top + toR.height / 2;
+  const tileW = toR.width;
+  const tileH = toR.height;
+
+  // Max size = right panel character card width
+  const rightCharImg = document.querySelector(".turn-char-img");
+  const maxSize = rightCharImg ? rightCharImg.getBoundingClientRect().width : 160;
+  const startSize = 40;
+
+  card.style.cssText = `
+    --player-color: ${player.color};
+    --player-glow: ${player.glow};
+    position: fixed;
+    left: ${startX}px;
+    top: ${startY}px;
+    width: ${startSize}px;
+    height: ${startSize}px;
+    opacity: 0;
+    z-index: 50000;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(1);
+  `;
+
+  playSound("whoosh");
+
+  // Phase 1: Appear + grow to center (700ms)
+  const anim1 = card.animate([
+    { left: startX + "px", top: startY + "px", width: startSize + "px", height: startSize + "px", opacity: 0, transform: "translate(-50%,-50%) scale(0.3) rotate(0deg)" },
+    { left: cx + "px", top: cy + "px", width: maxSize + "px", height: maxSize + "px", opacity: 1, transform: "translate(-50%,-50%) scale(1) rotate(-5deg)", offset: 0.7 },
+    { left: cx + "px", top: cy + "px", width: maxSize + "px", height: maxSize + "px", opacity: 1, transform: "translate(-50%,-50%) scale(1.08) rotate(3deg)" }
+  ], { duration: 700, easing: "ease-out", fill: "forwards" });
+
+  anim1.onfinish = () => {
+    playSound("sparkle");
+
+    // Phase 2: Pose — "이거 내땅이다!" (600ms)
+    const anim2 = card.animate([
+      { transform: "translate(-50%,-50%) scale(1.08) rotate(3deg)" },
+      { transform: "translate(-50%,-50%) scale(1.12) rotate(-3deg)", offset: 0.25 },
+      { transform: "translate(-50%,-50%) scale(1.05) rotate(2deg)", offset: 0.5 },
+      { transform: "translate(-50%,-50%) scale(1.1) rotate(-1deg)", offset: 0.75 },
+      { transform: "translate(-50%,-50%) scale(1) rotate(0deg)" }
+    ], { duration: 600, easing: "ease-in-out", fill: "forwards" });
+
+    anim2.onfinish = () => {
+      playSound("swoosh");
+
+      // Phase 3: Rise up then bomb-drop onto tile (600ms)
+      const anim3 = card.animate([
+        { left: cx + "px", top: cy + "px", width: maxSize + "px", height: maxSize + "px", opacity: 1, transform: "translate(-50%,-50%) scale(1) rotate(0deg)" },
+        { left: endX + "px", top: (endY - 200) + "px", width: (maxSize * 0.5) + "px", height: (maxSize * 0.5) + "px", opacity: 1, transform: "translate(-50%,-50%) scale(0.6) rotate(180deg)", offset: 0.45 },
+        { left: endX + "px", top: endY + "px", width: tileW + "px", height: tileH + "px", opacity: 1, transform: "translate(-50%,-50%) scale(1) rotate(360deg)" }
+      ], { duration: 600, easing: "cubic-bezier(0.3, 0, 0.9, 0.4)", fill: "forwards" });
+
+      anim3.onfinish = () => {
+        card.remove();
+        playSound("firework");
+        // Screen shake
+        document.body.classList.add("screen-shake");
+        setTimeout(() => document.body.classList.remove("screen-shake"), 500);
+        if (onDone) onDone();
+      };
+    };
+  };
+}
+
+function fxRentPayment(fromPlayer, toPlayer, spaceIndex, amount) {
+  const fromEl = _getPlayerPanelEl(fromPlayer.id);
+  const tileEl = _getBoardTileEl(spaceIndex);
+  const toEl   = _getPlayerPanelEl(toPlayer.id);
+
+  playSound("cash_out");
+  flashPanel(fromPlayer.id, "#ff4444", "out");
+  showCashPopup(fromEl, amount, false);
+
+  // Both waves launch simultaneously — red to tile, green to owner
+  spawnMoneyParticles(fromEl, tileEl, 14, "#ff6b6b", { duration: 900 });
+  setTimeout(() => {
+    playSound("cash_fly");
+    spawnMoneyParticles(tileEl, toEl, 14, "#6bcb77", {
+      duration: 900,
+      onComplete() {
+        flashPanel(toPlayer.id, "#44ff66", "in");
+        showCashPopup(toEl, amount, true);
+        playSound("cash_in");
+      }
+    });
+  }, 400);
+}
+
+function fxBonusGain(player, spaceIndex, amount) {
+  const tileEl  = _getBoardTileEl(spaceIndex);
+  const panelEl = _getPlayerPanelEl(player.id);
+
+  showTileCelebration(spaceIndex, "#ffd93d");
+  playSound("coins_shower");
+
+  setTimeout(() => {
+    spawnMoneyParticles(tileEl, panelEl, 20, "#ffd93d", {
+      duration: 1100,
+      onComplete() {
+        flashPanel(player.id, "#44ff66", "in");
+        showCashPopup(panelEl, amount, true);
+        playSound("cash_in");
+      }
+    });
+  }, 250);
+}
+
+function fxTaxCharge(player, spaceIndex, amount) {
+  const panelEl = _getPlayerPanelEl(player.id);
+
+  playSound("cash_drain");
+  flashPanel(player.id, "#ff4444", "out");
+  showCashPopup(panelEl, amount, false);
+
+  const boardCenter = document.querySelector(".board-center");
+  spawnMoneyParticles(panelEl, boardCenter || _getBoardTileEl(spaceIndex), 14, "#888888", {
+    symbol: "💸",
+    duration: 1100,
+  });
+}
+
+function fxUpgradeLandmark(player, spaceIndex, cost) {
+  const panelEl = _getPlayerPanelEl(player.id);
+  const tileEl  = _getBoardTileEl(spaceIndex);
+  const space = SPACE_DEFS[spaceIndex];
+  const landmark = space?.type === "landmark" ? getLandmark(space.landmarkId) : null;
+  const phase = landmark?.phase || "Early";
+  const level = landmark?.level ?? 1;
+
+  // Scale particle count by level: 12 base × level multiplier ratio
+  const particleCount = Math.round(12 * LEVEL_MULTIPLIERS[level] / 2);
+
+  playSound("cash_fly");
+  flashPanel(player.id, "#ff6b6b", "out");
+  showCashPopup(panelEl, cost, false);
+
+  spawnMoneyParticles(panelEl, tileEl, particleCount, "#b487ff", {
+    duration: 900,
+    onComplete() {
+      showPhaseCelebration(spaceIndex, player.color, phase, level);
+    }
+  });
+}
+
 function startTurnTimer(seconds) {
   stopTurnTimer();
   _cdRemaining = seconds;
@@ -2856,17 +3474,28 @@ function autoAdvanceTurn() {
 }
 
 // ── AI turn logic ─────────────────────────────────────────────────────────
+let _aiTurnTimer = null;
+
+function _scheduleAITurn(ms = 1200) {
+  if (_aiTurnTimer) clearTimeout(_aiTurnTimer);
+  _aiTurnTimer = setTimeout(() => { _aiTurnTimer = null; runAITurn(); }, ms);
+}
+
+function _cancelAITurn() {
+  if (_aiTurnTimer) { clearTimeout(_aiTurnTimer); _aiTurnTimer = null; }
+}
+
 async function runAITurn() {
   const player = currentPlayer();
   if (!player?.isAI || state.gameOver || state.turnBusy || state.turnStarted) return;
 
-  await delay(1100); // brief pause so humans can follow
+  await delay(1200);
   if (!currentPlayer()?.isAI || state.gameOver) return;
 
   await handleRoll();
 
-  // Wait briefly then decide post-roll action
-  await delay(700);
+  // Wait for move animation to finish
+  await delay(1500);
   const p = currentPlayer();
   if (!p?.isAI || state.gameOver || !state.turnStarted) return;
 
@@ -2875,25 +3504,25 @@ async function runAITurn() {
     const lm = getLandmark(pending.landmarkId);
     if (p.cash >= lm.cost) {
       buyLandmark(lm.id);
-      await delay(600);
+      // Wait for full buy animation (money fly + card fly + celebration)
+      await delay(3200);
     }
   } else if (pending?.type === "upgrade") {
     const lm = getLandmark(pending.landmarkId);
     if (p.cash >= lm.upgradeCost) {
       handleUpgrade(lm.id);
-      await delay(600);
+      await delay(1500);
     }
   }
 
   if (!state.gameOver && state.turnStarted) {
-    await delay(400);
+    await delay(500);
     handleEndTurn();
   }
 }
 
 function exposeDebugHooks() {
   window.render_game_to_text = renderGameToText;
-  window.advanceTime = advanceTime;
 }
 
 function renderGameToText() {
@@ -2997,10 +3626,6 @@ async function toggleFullscreen() {
   } else {
     await document.exitFullscreen?.();
   }
-}
-
-function primeAudio() {
-  // Sounds are synthesized — no preloading needed
 }
 
 function unlockAudio() {
@@ -3188,12 +3813,19 @@ function handleItemBuy(itemId) {
 
   const player = currentPlayer();
   const item = ITEM_DEFS.find((d) => d.id === itemId);
-  if (!player || !item || player.cash < item.price || player.inventory.length >= 3) return;
+  let itemCost = item ? item.price : 0;
+  if (player?.character?.passive?.id === "trade-bonus" && item) {
+    itemCost = Math.round(itemCost * (1 - player.character.passive.params.discount));
+  }
+  if (!player || !item || player.cash < itemCost || player.inventory.length >= 3) return;
   if (state.turnStarted || state.gameOver) return;
 
-  player.cash -= item.price;
+  player.cash -= itemCost;
   player.inventory.push(item.id);
-  addLog(`${player.name} purchased ${item.icon} ${item.name} for $${formatMoney(item.price)}.`);
+  if (itemCost < item.price) {
+    addLog(`${player.name}'s Trade Bonus passive saved 20% on ${item.name}.`);
+  }
+  addLog(`${player.name} purchased ${item.icon} ${item.name} for $${formatMoney(itemCost)}.`);
   playSound("buy");
   state.turnStarted = true;
   renderItemModal();
@@ -3561,12 +4193,13 @@ const lobbyState = {
   isHost:          false,
   errorMsg:        "",
   browseRooms:     [],
-  maxPlayers:      4,
+  maxPlayers:      Math.min(Math.max(Number(localStorage.getItem("bgame_playerCount")) || 4, 2), 6),
   isPublic:           true,
   suggestedRoomName:  "",
-  turnTimerEnabled:   false,
-  turnTimerSeconds:   60,
+  turnTimerEnabled:   (Number(localStorage.getItem("bgame_turnTimer")) || 0) > 0,
+  turnTimerSeconds:   Number(localStorage.getItem("bgame_turnTimer")) || 60,
   roundLimit:         Math.min(Math.max(Number(localStorage.getItem("bgame_roundLimit")) || 20, 10), 50),
+  characterId:        CHARACTER_DEFS[0].id,
 };
 
 function _lobbyColorSwatches(selectedIndex, takenSet = new Set()) {
@@ -3602,21 +4235,30 @@ function renderLobby(screen) {
   // ── Home ────────────────────────────────────────────────────────────────
   if (lobbyState.screen === "home") {
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Network Game</h2>
-      </div>
-      <div class="lobby-name-row">
-        <label class="lobby-label">My Name</label>
-        <input class="lobby-input lobby-input-plain" id="lobbyPlayerName" type="text"
-          maxlength="18" placeholder="Player" autocomplete="off"
-          value="${lobbyState.playerName}" />
-      </div>
-      <div class="lobby-color-row">
-        <label class="lobby-label">Color</label>
-        <div class="lobby-color-swatches" id="lobbyColorSwatches">
-          ${_lobbyColorSwatches(lobbyState.colorIndex)}
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">BulloMarble</h2>
+        <p class="setup-hero-desc">Roll, invest, and build the richest landmark empire on a 40-space board.</p>
+      </header>
+      <div class="lobby-profile-row">
+        <div class="lobby-profile-left">
+          <div class="lobby-name-row">
+            <label class="lobby-label">My Name</label>
+            <input class="lobby-input lobby-input-plain" id="lobbyPlayerName" type="text"
+              maxlength="18" placeholder="Player" autocomplete="off"
+              value="${lobbyState.playerName}" />
+          </div>
+          <div class="lobby-color-row">
+            <label class="lobby-label">My Color</label>
+            <div class="lobby-color-swatches" id="lobbyColorSwatches">
+              ${_lobbyColorSwatches(lobbyState.colorIndex)}
+            </div>
+          </div>
         </div>
+        <button type="button" class="char-card-btn" id="lobbyCharCardBtn" onclick="openLobbyCharSelect()">
+          <span class="char-card-label">${(() => { const ch = getCharacter(lobbyState.characterId); return ch.icon + " " + ch.name; })()}</span>
+          <img src="${getCharacter(lobbyState.characterId).portrait}" class="char-card-img" alt="">
+        </button>
       </div>
       <div class="lobby-actions">
         <button class="lobby-action-btn" onclick="lobbyShowCreate()">
@@ -3655,53 +4297,66 @@ function renderLobby(screen) {
       </label>`).join("");
 
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Create Room</h2>
-      </div>
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">Create Room</h2>
+      </header>
       <div class="lobby-form">
-        <label class="lobby-label">Room Name (optional)</label>
+        <label class="lobby-label">Seed</label>
+        <div class="seed-dropdown-wrap" id="lobbySeedDropdownWrap">
+          <button type="button" class="seed-dropdown-trigger" id="lobbySeedTrigger">
+            <span class="seed-dd-icon" id="lobbySeedIcon">${(() => { const s = SEED_CATALOG.find(x => x.id === activeSeedId); return s ? s.icon : "🎲"; })()}</span>
+            <span class="seed-dd-info">
+              <span class="seed-dd-name" id="lobbySeedName">${(() => { if (activeSeedId === "_random") return "Random Theme"; const s = SEED_CATALOG.find(x => x.id === activeSeedId); return s ? s.name : "Random Theme"; })()}</span>
+              <span class="seed-dd-desc" id="lobbySeedDesc">${(() => { if (activeSeedId === "_random") return "A random theme will be selected"; const s = SEED_CATALOG.find(x => x.id === activeSeedId); return s ? s.description : ""; })()}</span>
+            </span>
+            <span class="seed-dd-arrow">▾</span>
+          </button>
+        </div>
+
+        <div class="lobby-row-inline" style="margin-top:0.9rem; gap:0.6rem; align-items:flex-start;">
+          <div style="flex:5 1 0;">
+            <label class="lobby-label">Players</label>
+            <div class="lobby-radio-group">${maxOpts}</div>
+          </div>
+          <div style="flex:2 1 0; min-width:60px;">
+            <label class="lobby-label">Rounds</label>
+            <select class="round-limit-select" onchange="lobbySetRoundLimit(Number(this.value))">
+              ${[10,15,20,25,30,35,40,45,50].map(n => `<option value="${n}" ${lobbyState.roundLimit === n ? "selected" : ""}>${n}</option>`).join("")}
+            </select>
+          </div>
+          <div style="flex:4 1 0;">
+            <label class="lobby-label">Turn Timer</label>
+            <div class="lobby-radio-group">
+              <label class="lobby-radio-label"><input type="radio" name="lobbyTimer" value="0" ${!lobbyState.turnTimerEnabled ? "checked" : ""} onchange="lobbySetTurnTimer(false)"><span>Off</span></label>
+              <label class="lobby-radio-label"><input type="radio" name="lobbyTimer" value="30" ${lobbyState.turnTimerEnabled && lobbyState.turnTimerSeconds === 30 ? "checked" : ""} onchange="lobbySetTurnTimer(true);lobbySetTurnTimerSeconds(30)"><span>30s</span></label>
+              <label class="lobby-radio-label"><input type="radio" name="lobbyTimer" value="60" ${lobbyState.turnTimerEnabled && lobbyState.turnTimerSeconds === 60 ? "checked" : ""} onchange="lobbySetTurnTimer(true);lobbySetTurnTimerSeconds(60)"><span>60s</span></label>
+              <label class="lobby-radio-label"><input type="radio" name="lobbyTimer" value="90" ${lobbyState.turnTimerEnabled && lobbyState.turnTimerSeconds === 90 ? "checked" : ""} onchange="lobbySetTurnTimer(true);lobbySetTurnTimerSeconds(90)"><span>90s</span></label>
+            </div>
+          </div>
+        </div>
+
+        <label class="lobby-label" style="margin-top:0.9rem;">Room Name (optional)</label>
         <input class="lobby-input lobby-input-plain" id="lobbyRoomName" type="text"
           maxlength="24" placeholder="${lobbyState.suggestedRoomName}" autocomplete="off"
           value="${lobbyState.suggestedRoomName}" />
-
-        <div class="lobby-row-inline" style="margin-top:0.9rem; gap:1.2rem; align-items:flex-end;">
-          <div style="flex:1 1 auto;">
-            <label class="lobby-label">Max Players</label>
-            <div class="lobby-radio-group">${maxOpts}</div>
-          </div>
-          <div style="flex:0 0 auto; min-width:120px;">
-            <label class="lobby-label">Rounds</label>
-            <select class="round-limit-select" onchange="lobbySetRoundLimit(Number(this.value))">
-              ${[10,15,20,25,30,35,40,45,50].map(n => `<option value="${n}" ${lobbyState.roundLimit === n ? "selected" : ""}>${n} Rounds</option>`).join("")}
-            </select>
-          </div>
-        </div>
 
         <label class="lobby-label" style="margin-top:0.9rem;">Visibility</label>
         <div class="lobby-toggle-row">
           <button class="lobby-toggle-btn ${lobbyState.isPublic ? "active" : ""}" onclick="lobbySetPublic(true)">🌐 Public</button>
           <button class="lobby-toggle-btn ${!lobbyState.isPublic ? "active" : ""}" onclick="lobbySetPublic(false)">🔒 Private (code required)</button>
         </div>
-        ${!lobbyState.isPublic ? `
-        <p class="lobby-private-note">🔒 Room is visible in the list, but a 6-digit code is required to enter.<br>Share the code only with invited players.</p>` : ""}
-
-        <label class="lobby-label" style="margin-top:0.9rem;">Turn Timer</label>
-        <div class="lobby-toggle-row">
-          <button class="lobby-toggle-btn ${!lobbyState.turnTimerEnabled ? "active" : ""}" onclick="lobbySetTurnTimer(false)">⏸ Off</button>
-          <button class="lobby-toggle-btn ${lobbyState.turnTimerEnabled ? "active" : ""}" onclick="lobbySetTurnTimer(true)">⏱ On</button>
-        </div>
-        ${lobbyState.turnTimerEnabled ? `
-        <div class="lobby-timer-opts">
-          ${[30,60,90,120].map(s => `<label class="lobby-radio-label"><input type="radio" name="lobbyTimerSecs" value="${s}" ${lobbyState.turnTimerSeconds === s ? "checked" : ""} onchange="lobbySetTurnTimerSeconds(${s})"><span>${s}s</span></label>`).join("")}
-        </div>
-        <p class="lobby-timer-note">Auto-advance turn when time runs out.</p>` : ""}
+        <p class="lobby-private-note lobby-visibility-note">${lobbyState.isPublic
+          ? "🌐 Anyone can see and join this room<br>directly from the public room list."
+          : "🔒 Room is visible in the list, but a 6-digit<br>code is required. Share with invited players only."}</p>
       </div>
       <div class="lobby-row" style="margin-top:1.2rem;">
         ${backBtn}
         <button class="primary-button" onclick="lobbyConfirmCreate()">Create Room</button>
       </div>
     `;
+    // Wire up lobby seed dropdown
+    _initLobbySeedDropdown();
     return;
   }
 
@@ -3728,11 +4383,11 @@ function renderLobby(screen) {
     }
 
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Browse Rooms</h2>
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">Browse Rooms</h2>
         <button class="lobby-refresh-btn" onclick="lobbyRefreshBrowse()" title="Refresh">↺</button>
-      </div>
+      </header>
       <div class="lobby-room-list">${listHtml}</div>
       <div class="lobby-status-msg" style="font-size:0.78rem;">Live updates active...</div>
       ${backBtn}
@@ -3743,10 +4398,10 @@ function renderLobby(screen) {
   // ── Join by code ─────────────────────────────────────────────────────────
   if (lobbyState.screen === "join-code") {
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Join by Code</h2>
-      </div>
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">Join by Code</h2>
+      </header>
       <div class="lobby-form">
         <label class="lobby-label">Room Code (6 digits)</label>
         <input class="lobby-input" id="lobbyRoomCode" type="text"
@@ -3764,10 +4419,10 @@ function renderLobby(screen) {
   // ── No server ─────────────────────────────────────────────────────────────
   if (lobbyState.screen === "no-server") {
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Server Unavailable</h2>
-      </div>
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">Server Unavailable</h2>
+      </header>
       <div class="lobby-error-msg">
         ⚠️ Could not connect to the game server.<br><br>
         Please check that the Railway.app server is running,<br>
@@ -3791,18 +4446,12 @@ function renderLobby(screen) {
       </div>`).join("");
 
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Waiting for Players</h2>
-      </div>
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">Waiting for Players</h2>
+      </header>
       <div class="lobby-room-code">${lobbyState.roomCode}</div>
       <p class="lobby-room-code-label">Share this code with other players</p>
-      <div class="lobby-color-row">
-        <label class="lobby-label">My Color</label>
-        <div class="lobby-color-swatches" id="waitingColorSwatches">
-          ${_waitingColorSwatches(lobbyState.players, lobbyState.colorIndex)}
-        </div>
-      </div>
       <div class="lobby-player-list">
         <p class="lobby-player-list-label">Players ${lobbyState.players.length} / ${lobbyState.maxPlayers}</p>
         ${playerRows}
@@ -3826,17 +4475,11 @@ function renderLobby(screen) {
       </div>`).join("");
 
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Joined Room</h2>
-      </div>
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">Joined Room</h2>
+      </header>
       <div class="lobby-room-code">${lobbyState.roomCode}</div>
-      <div class="lobby-color-row">
-        <label class="lobby-label">My Color</label>
-        <div class="lobby-color-swatches" id="waitingColorSwatches">
-          ${_waitingColorSwatches(lobbyState.players, lobbyState.colorIndex)}
-        </div>
-      </div>
       <div class="lobby-player-list">
         <p class="lobby-player-list-label">Players ${lobbyState.players.length} / ${lobbyState.maxPlayers}</p>
         ${playerRows}
@@ -3850,10 +4493,10 @@ function renderLobby(screen) {
   // ── Error ─────────────────────────────────────────────────────────────────
   if (lobbyState.screen === "error") {
     card.innerHTML = `
-      <div class="lobby-header">
-        <p class="lobby-eyebrow">BulloMarble · Online Play</p>
-        <h2 class="lobby-title">Error</h2>
-      </div>
+      <header class="setup-hero">
+        <p class="eyebrow">BulloMarble · Online Play</p>
+        <h2 class="setup-title">Error</h2>
+      </header>
       <div class="lobby-error-msg">${lobbyState.errorMsg ?? "An unknown error occurred."}</div>
       <button class="secondary-button" onclick="lobbyGoBack()">← Back</button>
     `;
@@ -3902,28 +4545,110 @@ function lobbyWaitingChangeColor(index) {
   }
 }
 
+function lobbySetCharacter(charId) {
+  lobbyState.characterId = charId;
+  networkSocket?.emit("change_character", { code: lobbyState.roomCode, characterId: charId });
+}
+window.lobbySetCharacter = lobbySetCharacter;
+
 function lobbySetMaxPlayers(n) {
   lobbyState.maxPlayers = n;
+  localStorage.setItem("bgame_playerCount", String(n));
 }
 
 function lobbySetPublic(isPublic) {
   lobbyState.isPublic = isPublic;
-  renderLobby(); // re-render create screen to show/hide pw field
+  renderLobby();
 }
 
 function lobbySetTurnTimer(enabled) {
   lobbyState.turnTimerEnabled = enabled;
+  if (!enabled) localStorage.setItem("bgame_turnTimer", "0");
   renderLobby();
 }
 
 function lobbySetTurnTimerSeconds(s) {
   lobbyState.turnTimerSeconds = s;
+  localStorage.setItem("bgame_turnTimer", String(s));
 }
 
 function lobbySetRoundLimit(n) {
   lobbyState.roundLimit = n;
   localStorage.setItem("bgame_roundLimit", n);
   activeRoundLimit = n;
+}
+
+function _initLobbySeedDropdown() {
+  const trigger = document.getElementById("lobbySeedTrigger");
+  if (!trigger) return;
+  const iconEl = document.getElementById("lobbySeedIcon");
+  const nameEl = document.getElementById("lobbySeedName");
+  const descEl = document.getElementById("lobbySeedDesc");
+
+  // Clean up any previous lobby seed list from body
+  const old = document.getElementById("lobbySeedListBody");
+  if (old) old.remove();
+
+  function updateDisplay(id) {
+    if (id === "_random") {
+      iconEl.textContent = "🎲"; nameEl.textContent = "Random Theme"; descEl.textContent = "A random theme will be selected";
+    } else {
+      const s = SEED_CATALOG.find(x => x.id === id);
+      if (s) { iconEl.textContent = s.icon; nameEl.textContent = s.name; descEl.textContent = s.description; }
+    }
+  }
+
+  // Create list element directly on body
+  const list = document.createElement("div");
+  list.id = "lobbySeedListBody";
+  list.className = "seed-dropdown-list seed-dropdown-list--short hidden";
+  list.innerHTML = `
+    <button type="button" class="seed-dd-item ${activeSeedId === "_random" ? "active" : ""}" data-seed-id="_random">
+      <span class="seed-dd-item-num">-</span><span class="seed-dd-item-icon">🎲</span>
+      <span class="seed-dd-item-info"><span class="seed-dd-item-name">Random Theme</span><span class="seed-dd-item-desc">A random theme will be selected</span></span>
+    </button>
+    ${SEED_CATALOG.map((s, i) => `
+      <button type="button" class="seed-dd-item ${s.id === activeSeedId ? "active" : ""}" data-seed-id="${s.id}">
+        <span class="seed-dd-item-num">${i + 1}</span><span class="seed-dd-item-icon">${s.icon}</span>
+        <span class="seed-dd-item-info"><span class="seed-dd-item-name">${s.name}</span><span class="seed-dd-item-desc">${s.description}</span></span>
+      </button>
+    `).join("")}
+  `;
+  document.body.appendChild(list);
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const wasHidden = list.classList.contains("hidden");
+    if (wasHidden) {
+      list.classList.remove("hidden");
+      const r = trigger.getBoundingClientRect();
+      list.style.left = r.left + "px";
+      list.style.width = r.width + "px";
+      list.style.top = (r.bottom + 4) + "px";
+    } else {
+      list.classList.add("hidden");
+    }
+  });
+
+  list.addEventListener("mousedown", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const item = e.target.closest("[data-seed-id]");
+    if (!item) return;
+    const id = item.dataset.seedId;
+    list.querySelectorAll(".seed-dd-item").forEach(i => i.classList.remove("active"));
+    item.classList.add("active");
+    localStorage.setItem("bgame_seedId", id);
+    activeSeedId = id;
+    updateDisplay(id);
+    list.classList.add("hidden");
+  });
+
+  // Use a named handler to avoid stacking
+  if (_initLobbySeedDropdown._docHandler) {
+    document.removeEventListener("click", _initLobbySeedDropdown._docHandler);
+  }
+  _initLobbySeedDropdown._docHandler = () => list.classList.add("hidden");
+  document.addEventListener("click", _initLobbySeedDropdown._docHandler);
 }
 
 function lobbyShowCreate() {
@@ -3956,7 +4681,6 @@ function lobbyShowBrowse() {
   fetch("/api/rooms")
     .then((r) => r.json())
     .then((rooms) => {
-      console.log("[lobby] /api/rooms →", rooms.length, "rooms");
       lobbyState.browseRooms = rooms;
       if (lobbyState.screen === "browse") renderLobby();
     })
@@ -4010,16 +4734,13 @@ function connectSocket() {
 function attachSocketHandlers(socket) {
   // ── Connection events ─────────────────────────────
   socket.on("connect", () => {
-    console.log("[socket] connected:", socket.id);
     // If the user is on the browse screen, request the room list now
     if (lobbyState.screen === "browse") {
-      console.log("[lobby] watch_rooms emit (on connect)");
       socket.emit("watch_rooms");
     }
   });
 
   socket.on("disconnect", (reason) => {
-    console.log("[socket] disconnected:", reason);
   });
 
   // ── Lobby events ─────────────────────────────────
@@ -4051,13 +4772,17 @@ function attachSocketHandlers(socket) {
     renderLobby();
   });
 
+  socket.on("character_changed", ({ players }) => {
+    lobbyState.players = players;
+    renderLobby();
+  });
+
   socket.on("player_left", ({ players }) => {
     lobbyState.players = players;
     renderLobby();
   });
 
   socket.on("rooms_updated", (rooms) => {
-    console.log("[lobby] rooms_updated received:", rooms.length, "rooms, screen:", lobbyState.screen);
     lobbyState.browseRooms = rooms;
     if (lobbyState.screen === "browse") renderLobby();
   });
@@ -4069,14 +4794,26 @@ function attachSocketHandlers(socket) {
 
   // ── Game events ──────────────────────────────────
   socket.on("game_started", (serverState) => {
+    _diceInitialized = false;
     if (serverState.roundLimit) {
       activeRoundLimit = serverState.roundLimit;
       localStorage.setItem("bgame_roundLimit", serverState.roundLimit);
     }
+    // Load the seed used by the server
+    if (serverState.seedId) {
+      loadSeed(serverState.seedId, false); // Don't shuffle — server already did
+    }
+    // Enrich each player with their character data
+    if (serverState.players) {
+      serverState.players.forEach(p => {
+        if (p.characterId) {
+          p.character = getCharacter(p.characterId);
+        }
+      });
+    }
     applyServerState(serverState);
     ui.lobbyOverlay.classList.add("hidden");
     ui.winnerOverlay.classList.add("hidden");
-    primeAudio();
     render();
     const firstPlayer = state.players[0];
     requestAnimationFrame(() => {
@@ -4092,7 +4829,44 @@ function attachSocketHandlers(socket) {
   socket.on("state_update", (serverState) => {
     const prevIdx   = state.currentPlayerIndex;
     const prevRound = state.round;
+    const wasRolling = state.rolling;
+    // If rolling, delay applying state so dice animation plays
+    if (wasRolling) {
+      const savedDice = serverState.dice;
+      state.rolling = true; // keep rolling
+      setTimeout(() => {
+        applyServerState(serverState);
+        state.rolling = false;
+        render();
+      }, 600);
+      return;
+    }
     applyServerState(serverState);
+
+    // Trigger money effects based on lastAction from server
+    if (serverState.lastAction) {
+      const act = serverState.lastAction;
+      requestAnimationFrame(() => {
+        if (act.type === "buy") {
+          const p = state.players.find(pl => pl.id === act.playerId);
+          if (p) fxBuyLandmark(p, act.spaceIndex, act.amount);
+        } else if (act.type === "rent") {
+          const from = state.players.find(pl => pl.id === act.fromId);
+          const to   = state.players.find(pl => pl.id === act.toId);
+          if (from && to) fxRentPayment(from, to, act.spaceIndex, act.amount);
+        } else if (act.type === "bonus") {
+          const p = state.players.find(pl => pl.id === act.playerId);
+          if (p) fxBonusGain(p, act.spaceIndex, act.amount);
+        } else if (act.type === "tax") {
+          const p = state.players.find(pl => pl.id === act.playerId);
+          if (p) fxTaxCharge(p, act.spaceIndex, act.amount);
+        } else if (act.type === "upgrade") {
+          const p = state.players.find(pl => pl.id === act.playerId);
+          if (p) fxUpgradeLandmark(p, act.spaceIndex, act.amount);
+        }
+      });
+    }
+
     if (serverState.gameOver) {
       stopTurnTimer();
       showFireworks(3800, () => renderWinnerOverlay());
@@ -4126,10 +4900,24 @@ function attachSocketHandlers(socket) {
 
 function applyServerState(serverState) {
   // Enrich landmarks with client visual data (images, tones, profiles)
+  // Server uses World Landmarks IDs; client uses seed-specific IDs.
+  // Match by index position (cost order is identical).
   if (serverState.landmarks) {
-    serverState.landmarks = serverState.landmarks.map((lm) => {
-      const def = LANDMARK_DEFS.find((d) => d.id === lm.id);
-      return def ? { ...def, ...lm } : lm;
+    serverState.landmarks = serverState.landmarks.map((lm, idx) => {
+      const def = LANDMARK_DEFS[idx];
+      if (def) {
+        // Preserve server game state (ownerId, level) but use client visual data
+        return { ...def, ownerId: lm.ownerId, level: lm.level };
+      }
+      return lm;
+    });
+  }
+  // Enrich players with character data (server doesn't send character objects)
+  if (serverState.players) {
+    serverState.players.forEach(p => {
+      if (p.characterId && !p.character) {
+        p.character = getCharacter(p.characterId);
+      }
     });
   }
   // Merge server state, preserving client-only UI fields
@@ -4158,12 +4946,14 @@ function lobbyConfirmCreate() {
   socket.emit("create_room", {
     name,
     colorIndex:      lobbyState.colorIndex,
+    characterId:     lobbyState.characterId,
     roomName,
     maxPlayers:      lobbyState.maxPlayers,
     isPublic:        lobbyState.isPublic,
     password:        "",
     turnTimerSeconds: lobbyState.turnTimerEnabled ? lobbyState.turnTimerSeconds : 0,
     roundLimit:      lobbyState.roundLimit,
+    seedId:          activeSeedId === "_random" ? getRandomSeed().id : activeSeedId,
   });
 }
 
@@ -4192,16 +4982,12 @@ function _doJoin(code, password) {
   const name = lobbyState.playerName || "Player";
   const socket = connectSocket();
   if (!socket) return;
-  socket.emit("join_room", { code, name, colorIndex: lobbyState.colorIndex, password });
+  socket.emit("join_room", { code, name, colorIndex: lobbyState.colorIndex, characterId: lobbyState.characterId, password });
 }
 
 function lobbyStartGame() {
   networkSocket?.emit("start_game", { code: lobbyState.roomCode });
 }
-
-// ── Legacy alias kept for any existing onclick references ─────────────────
-function lobbyCreateRoom() { lobbyShowCreate(); }
-function lobbyJoinRoom()   { lobbyShowJoinCode(); }
 
 window.renderLobby           = renderLobby;
 window.lobbyGoBack           = lobbyGoBack;
@@ -4220,8 +5006,6 @@ window.lobbyConfirmCreate    = lobbyConfirmCreate;
 window.lobbyJoinFromList          = lobbyJoinFromList;
 window.lobbyJoinPrivateFromList   = lobbyJoinPrivateFromList;
 window.lobbyJoinByCode       = lobbyJoinByCode;
-window.lobbyCreateRoom       = lobbyCreateRoom;
-window.lobbyJoinRoom         = lobbyJoinRoom;
 window.lobbyStartGame        = lobbyStartGame;
 window.toggleAIPlayer          = toggleAIPlayer;
 window.lobbyWaitingChangeColor = lobbyWaitingChangeColor;

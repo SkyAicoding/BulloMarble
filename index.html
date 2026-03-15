@@ -9,10 +9,10 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307131e'/%3E%3Cpath d='M14 46h36L32 12z' fill='%23efc77b'/%3E%3Ccircle cx='32' cy='26' r='7' fill='%2307131e'/%3E%3C/svg%3E"
     />
     <link rel="preload" as="image" href="assets/ui/world-landmark-main-board.png" />
-    <link rel="stylesheet" href="styles.css?v=20260315-v1.0" />
+    <link rel="stylesheet" href="styles.css?v=20260315-v2.0" />
     <!-- Socket.io client — served by Node server; silently skipped when opened via file:// -->
     <script src="/socket.io/socket.io.js" onerror="window._socketIOUnavailable=true"></script>
-    <script type="module" src="src/main.js?v=20260315-v1.0"></script>
+    <script type="module" src="src/main.js?v=20260315-v2.0"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -21,9 +21,15 @@
         <!-- ── LEFT SIDEBAR ── -->
         <aside class="left-sidebar">
           <div class="sidebar-brand">
-            <p class="eyebrow">Bull × Marble</p>
+            <p class="eyebrow" id="sidebarModeLabel">Local Play</p>
             <h1 class="sidebar-title">BulloMarble</h1>
+            <p class="sidebar-seed-label" id="sidebarSeedLabel"></p>
           </div>
+
+          <nav class="sidebar-menu">
+            <button class="menu-btn" id="homeButton" type="button">⌂ Game Mode Select</button>
+            <button class="menu-btn" id="stopGameButton" type="button">← End Game</button>
+          </nav>
 
           <div class="sidebar-round">
             <div class="metric-pill round-pill">
@@ -31,11 +37,6 @@
               <strong id="roundLabel">1</strong>
             </div>
           </div>
-
-          <nav class="sidebar-menu">
-            <button class="menu-btn" id="homeButton" type="button">⌂ Game Mode Select</button>
-            <button class="menu-btn" id="stopGameButton" type="button">← End Game</button>
-          </nav>
 
           <div class="players-panel" id="playersStrip"></div>
 
@@ -65,6 +66,7 @@
             <section class="dock-section player-panel" id="turnCard"></section>
 
             <section class="dock-section control-panel">
+              <div class="status-aura-wrap" id="statusAura"></div>
               <div class="dice-row" id="diceRow"></div>
               <div class="action-buttons">
                 <button class="primary-button" id="rollButton" type="button">Roll Dice</button>
@@ -114,11 +116,11 @@
     <div class="overlay hidden" id="setupOverlay">
       <div class="setup-shell">
 
-        <!-- 1. Hero: Title & Description -->
+        <!-- 1. Hero: Title + Description -->
         <header class="setup-hero">
           <p class="eyebrow">BulloMarble · Local Play</p>
-          <h2 class="setup-title">Build The Richest Global Landmark Portfolio</h2>
-          <p class="setup-hero-desc">Roll around a square 40-space board with 10 spaces on each side, hit START, TAX, FREE PARKING, and WORLD EVENT, then climb from parks and small attractions to famous landmarks and finally skyscrapers plus mega landmarks.</p>
+          <h2 class="setup-title">BulloMarble</h2>
+          <p class="setup-hero-desc">Roll, invest, and build the richest landmark empire on a 40-space board.</p>
         </header>
 
         <form class="setup-form" id="setupForm">
@@ -132,31 +134,56 @@
             <option value="6">6</option>
           </select>
 
-          <!-- 2-1: Player Count + Round Limit -->
-          <div class="setup-row-inline">
-            <div class="setup-section">
+          <!-- Seed Select -->
+          <div class="setup-section">
+            <p class="setup-section-label">Seed</p>
+            <div class="seed-dropdown-wrap" id="seedDropdownWrap">
+              <button type="button" class="seed-dropdown-trigger" id="seedDropdownTrigger">
+                <span class="seed-dd-icon" id="seedDdIcon">🌍</span>
+                <span class="seed-dd-info">
+                  <span class="seed-dd-name" id="seedDdName">World Landmarks</span>
+                  <span class="seed-dd-desc" id="seedDdDesc">Classic world tour</span>
+                </span>
+                <span class="seed-dd-arrow">▾</span>
+              </button>
+              <div class="seed-dropdown-list hidden" id="seedDropdownList"></div>
+            </div>
+          </div>
+
+          <!-- 2-1: Players + Rounds + Turn Timer (single row) -->
+          <div class="setup-row-triple">
+            <div class="setup-section setup-section-compact">
               <p class="setup-section-label">Players</p>
               <div class="player-count-radios" id="playerCountRadios">
-                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="2"><span>2 Player</span></label>
-                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="3"><span>3 Player</span></label>
-                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="4" checked><span>4 Player</span></label>
-                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="5"><span>5 Player</span></label>
-                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="6"><span>6 Player</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="2"><span>2P</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="3"><span>3P</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="4" checked><span>4P</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="5"><span>5P</span></label>
+                <label class="count-radio"><input type="radio" name="uiPlayerCount" value="6"><span>6P</span></label>
               </div>
             </div>
-            <div class="setup-section setup-section-rounds">
+            <div class="setup-section setup-section-compact">
               <p class="setup-section-label">Rounds</p>
               <select id="roundLimitSelect" class="round-limit-select">
-                <option value="10">10 Rounds</option>
-                <option value="15">15 Rounds</option>
-                <option value="20" selected>20 Rounds</option>
-                <option value="25">25 Rounds</option>
-                <option value="30">30 Rounds</option>
-                <option value="35">35 Rounds</option>
-                <option value="40">40 Rounds</option>
-                <option value="45">45 Rounds</option>
-                <option value="50">50 Rounds</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="20" selected>20</option>
+                <option value="25">25</option>
+                <option value="30">30</option>
+                <option value="35">35</option>
+                <option value="40">40</option>
+                <option value="45">45</option>
+                <option value="50">50</option>
               </select>
+            </div>
+            <div class="setup-section setup-section-compact">
+              <p class="setup-section-label">Turn Timer</p>
+              <div class="player-count-radios" id="turnTimerRadios">
+                <label class="count-radio"><input type="radio" name="uiTurnTimer" value="0" checked><span>Off</span></label>
+                <label class="count-radio"><input type="radio" name="uiTurnTimer" value="30"><span>30s</span></label>
+                <label class="count-radio"><input type="radio" name="uiTurnTimer" value="60"><span>60s</span></label>
+                <label class="count-radio"><input type="radio" name="uiTurnTimer" value="90"><span>90s</span></label>
+              </div>
             </div>
           </div>
 
@@ -165,30 +192,10 @@
             <div class="name-grid" id="playerFields"></div>
           </div>
 
-          <!-- 2-3: Turn Timer -->
-          <div class="setup-section">
-            <p class="setup-section-label">Turn Timer</p>
-            <div class="player-count-radios" id="turnTimerRadios">
-              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="0" checked><span>Off</span></label>
-              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="30"><span>30s</span></label>
-              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="60"><span>60s</span></label>
-              <label class="count-radio"><input type="radio" name="uiTurnTimer" value="90"><span>90s</span></label>
-            </div>
-          </div>
-
-          <!-- 2-4: Instructions -->
-          <div class="setup-section setup-notes">
-            <span>🖥 Hot-seat play on one device</span>
-            <span>🔄 Corner route: START → TAX → FREE PARKING → WORLD EVENT</span>
-            <span>📈 Board flow: early attractions → mid landmarks → late skyline giants</span>
-            <span>🏆 Selected-round summit or 4 Global Landmarks triggers the final audit</span>
-            <span>💰 Ranking = cash + landmark value + upgrade value</span>
-          </div>
-
-          <!-- 2-5: Launch -->
+          <!-- 2-3: Launch -->
           <div class="setup-launch-row">
             <button type="button" class="secondary-button" onclick="backToModeSelect()">← Game Mode Select</button>
-            <button class="primary-button launch-button" type="submit">Launch Game</button>
+            <button class="primary-button launch-button" type="submit">Start Game</button>
           </div>
 
         </form>

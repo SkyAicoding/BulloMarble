@@ -75,12 +75,12 @@ io.on("connection", (socket) => {
   });
 
   // ── Lobby: create room ────────────────────────────────────────
-  socket.on("create_room", ({ name, colorIndex, roomName, maxPlayers, isPublic, password, turnTimerSeconds, roundLimit }) => {
+  socket.on("create_room", ({ name, colorIndex, characterId, roomName, maxPlayers, isPublic, password, turnTimerSeconds, roundLimit, seedId }) => {
     let code;
     do { code = generateRoomCode(); } while (rooms.has(code));
 
-    const room = new GameRoom(code, { roomName, maxPlayers, isPublic, password, turnTimerSeconds, roundLimit });
-    room.addPlayer({ socketId: socket.id, name, colorIndex: colorIndex ?? 0, isHost: true });
+    const room = new GameRoom(code, { roomName, maxPlayers, isPublic, password, turnTimerSeconds, roundLimit, seedId });
+    room.addPlayer({ socketId: socket.id, name, colorIndex: colorIndex ?? 0, characterId: characterId || null, isHost: true });
     rooms.set(code, room);
     socket.join(code);
     socket.leave("__lobby__");
@@ -98,7 +98,7 @@ io.on("connection", (socket) => {
   });
 
   // ── Lobby: join room (by code) ────────────────────────────────
-  socket.on("join_room", ({ code, name, colorIndex, password }) => {
+  socket.on("join_room", ({ code, name, colorIndex, characterId, password }) => {
     const room = rooms.get(code);
     if (!room)
       return socket.emit("lobby_error", { message: "Room code not found." });
@@ -117,7 +117,7 @@ io.on("connection", (socket) => {
         if (!takenColors.has(i)) { resolvedColor = i; break; }
       }
     }
-    room.addPlayer({ socketId: socket.id, name, colorIndex: resolvedColor, isHost: false });
+    room.addPlayer({ socketId: socket.id, name, colorIndex: resolvedColor, characterId: characterId || null, isHost: false });
     socket.join(code);
     socket.leave("__lobby__");
 
@@ -147,6 +147,20 @@ io.on("connection", (socket) => {
     if (taken) return socket.emit("lobby_error", { message: "Color already taken." });
     player.colorIndex = colorIndex;
     io.to(code).emit("room_updated", {
+      players:    room.players,
+      maxPlayers: room.maxPlayers,
+      roomName:   room.roomName || `${room.players[0]?.name ?? "?"}'s Room`,
+    });
+  });
+
+  // ── Lobby: change character ──────────────────────────────────
+  socket.on("change_character", ({ code, characterId }) => {
+    const room = rooms.get(code);
+    if (!room || room.started) return;
+    const player = room.players.find(p => p.socketId === socket.id);
+    if (!player) return;
+    player.characterId = characterId;
+    io.to(code).emit("character_changed", {
       players:    room.players,
       maxPlayers: room.maxPlayers,
       roomName:   room.roomName || `${room.players[0]?.name ?? "?"}'s Room`,
@@ -242,8 +256,30 @@ io.on("connection", (socket) => {
   });
 });
 
+// ── Room cleanup timer ────────────────────────────────────────────────────
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [code, room] of rooms) {
+    const age = now - room.createdAt;
+    const isEmpty = room.players.length === 0;
+    const isStale = !room.started && age > 5 * 60 * 1000;      // 5min unstarted
+    const isFinished = room.started && room.state?.gameOver;
+    const isAbandoned = room.started && room.players.length <= 1 && age > 60 * 1000; // 1min with ≤1 player
+
+    if (isEmpty || isStale || isFinished || isAbandoned) {
+      rooms.delete(code);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    console.log(`[cleanup] removed ${cleaned} stale rooms, ${rooms.size} remaining`);
+    broadcastRoomList();
+  }
+}, 30_000); // every 30 seconds
+
 // ── Start ──────────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3100;
 httpServer.listen(PORT, () => {
   console.log(`BulloMarble server listening on http://localhost:${PORT}`);
 });

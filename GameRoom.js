@@ -1,18 +1,14 @@
 // ── Constants (mirrored from src/main.js) ─────────────────────────────────
-const BOARD_SIZE        = 11;
 const BOARD_SPACES      = 40;
 const STARTING_CASH     = 1500;
 const PASS_START_BONUS  = 200;
 const EXACT_START_BONUS = 150;
-const ROUND_LIMIT       = 20;
 const MAX_UPGRADE_LEVEL = 3;
 const MAJOR_VICTORY_GLOBALS = 4;
 const LIQUIDATION_RATE  = 0.7;
 const RENT_MULTIPLIERS  = [1, 1.85, 3.05, 4.55];
 const UPGRADE_LEVELS    = ["Owned", "Developed", "Major Attraction", "Global Landmark"];
-const SHORT_TIER_LABELS = ["OWN", "DEV", "MAJ", "GLB"];
 const EVENT_POSITIONS   = [0, 3, 7, 10, 13, 17, 20, 23, 27, 30, 33, 37];
-const CORNER_INDICES    = new Set([0, 10, 20, 30]);
 
 const COLOR_PALETTE = [
   { color: "#efc77b", glow: "rgba(239,199,123,0.55)", label: "Gold"   },
@@ -125,15 +121,6 @@ const EVENT_DEFS = [
 ];
 
 // ── Board layout ───────────────────────────────────────────────────────────
-function buildBoardPositions(size) {
-  const positions = [];
-  for (let col = 1; col <= size; col++) positions.push([size, col]);
-  for (let row = size - 1; row >= 1; row--) positions.push([row, size]);
-  for (let col = size - 1; col >= 1; col--) positions.push([1, col]);
-  for (let row = 2; row <= size - 1; row++) positions.push([row, 1]);
-  return positions;
-}
-
 function buildSpaceDefs() {
   const eventByPos = new Map(EVENT_POSITIONS.map((pos, i) => [pos, EVENT_DEFS[i]]));
   const spaces = [];
@@ -150,12 +137,28 @@ function buildSpaceDefs() {
   return spaces;
 }
 
-const BOARD_POSITIONS = buildBoardPositions(BOARD_SIZE);
 const SPACE_DEFS      = buildSpaceDefs();
+
+// ── Character passives ────────────────────────────────────────────────────
+const CHAR_PASSIVES = {
+  "tycoon":    { id: "land-discount",     params: { discount: 0.10 } },
+  "broker":    { id: "rent-boost",        params: { boost: 0.15 } },
+  "architect": { id: "upgrade-discount",  params: { discount: 0.15 } },
+  "explorer":  { id: "extra-move",        params: { extra: 1 } },
+  "banker":    { id: "interest",          params: { rate: 0.03 } },
+  "gambler":   { id: "double-or-nothing", params: { chance: 0.5 } },
+  "diplomat":  { id: "tax-shield",        params: { reduction: 0.30 } },
+  "engineer":  { id: "fast-build",        params: {} },
+  "spy":       { id: "intel",             params: { cashback: 0.15 } },
+  "merchant":  { id: "trade-bonus",       params: { discount: 0.20 } },
+  "oracle":    { id: "foresight",         params: { multiplier: 2 } },
+  "commander": { id: "rally",            params: { threshold: 3, boost: 0.10 } },
+};
+function getPassive(charId) { return CHAR_PASSIVES[charId] || null; }
 
 // ── GameRoom class ─────────────────────────────────────────────────────────
 export class GameRoom {
-  constructor(code, { roomName = "", maxPlayers = 4, isPublic = true, password = "", turnTimerSeconds = 0, roundLimit = 20 } = {}) {
+  constructor(code, { roomName = "", maxPlayers = 4, isPublic = true, password = "", turnTimerSeconds = 0, roundLimit = 20, seedId = "world-landmarks" } = {}) {
     this.code             = code;
     this.roomName         = roomName || "";
     this.maxPlayers       = Math.min(Math.max(Number(maxPlayers) || 4, 2), 6);
@@ -163,9 +166,11 @@ export class GameRoom {
     this.password         = password || "";
     this.turnTimerSeconds = Number(turnTimerSeconds) || 0;
     this.roundLimit       = Math.min(Math.max(Number(roundLimit) || 20, 10), 50);
+    this.seedId           = seedId || "world-landmarks";
     this.players          = [];   // { socketId, name, colorIndex, isHost }
     this.started          = false;
     this.state            = null;
+    this.createdAt        = Date.now();
   }
 
   // ── Player management ────────────────────────────────────────────
@@ -204,6 +209,7 @@ export class GameRoom {
     const names        = this.players.map((p) => p.name);
     const colorIndices = this.players.map((p) => p.colorIndex);
     const socketIds    = this.players.map((p) => p.socketId);
+    const characterIds = this.players.map((p) => p.characterId || null);
 
     this.state = {
       players: names.map((name, i) => {
@@ -212,6 +218,7 @@ export class GameRoom {
           id:           `player-${i}`,
           socketId:     socketIds[i],
           name,
+          characterId:  characterIds[i],
           color:        palette.color,
           glow:         palette.glow,
           colorName:    palette.label,
@@ -225,6 +232,7 @@ export class GameRoom {
           activeEffects:[],
         };
       }),
+      seedId:              this.seedId,
       landmarks:           this._createLandmarkState(),
       currentPlayerIndex:  0,
       selectedSpaceIndex:  0,
@@ -240,6 +248,7 @@ export class GameRoom {
       winnerReason:        null,
       shopStock:           this._generateShopStock(),
       rankingReady:        false,
+      lastAction:          null,
     };
 
     this._addLog(`${this._currentPlayer().name} begins on START with $${this._fmt(STARTING_CASH)}.`);
@@ -270,6 +279,11 @@ export class GameRoom {
       total += 3;
       this._consumeEffect(player, "shortcut-map");
       this._addLog(`${player.name}'s Shortcut Map added 3 bonus spaces.`);
+    }
+    const explorerPassive = getPassive(player.characterId);
+    if (explorerPassive && explorerPassive.id === "extra-move") {
+      total += explorerPassive.params.extra;
+      this._addLog(`${player.name}'s Explorer passive: +${explorerPassive.params.extra} bonus move.`);
     }
     this._addLog(`${player.name} rolled ${d1} + ${d2} and advances ${total} spaces.`);
 
@@ -303,12 +317,24 @@ export class GameRoom {
       this._consumeEffect(player, "discount-deed");
       this._addLog(`${player.name} used Discount Deed — 30% off!`);
     }
+    const buyPassive = getPassive(player.characterId);
+    if (buyPassive && buyPassive.id === "land-discount") {
+      cost = Math.round(cost * (1 - buyPassive.params.discount));
+      this._addLog(`${player.name}'s Tycoon passive: ${Math.round(buyPassive.params.discount * 100)}% land discount applied.`);
+    }
     player.cash -= cost;
     if (player.cash < 0) player.cash = 0;
     lm.ownerId = player.id;
     lm.level   = 0;
+    if (buyPassive && buyPassive.id === "fast-build") {
+      if (lm.level < MAX_UPGRADE_LEVEL) {
+        lm.level += 1;
+        this._addLog(`${player.name}'s Engineer passive: ${lm.name} auto-upgraded to ${UPGRADE_LEVELS[lm.level]}!`);
+      }
+    }
     st.pendingAction = null;
-    this._addLog(`${player.name} acquired ${lm.name} for $${this._fmt(lm.cost)}.`);
+    st.lastAction = { type: "buy", playerId: player.id, spaceIndex: player.position, amount: cost };
+    this._addLog(`${player.name} acquired ${lm.name} for $${this._fmt(cost)}.`);
     this._checkEnd("purchase");
     return st;
   }
@@ -328,9 +354,16 @@ export class GameRoom {
 
     if (!lm || lm.ownerId !== player.id || lm.level >= MAX_UPGRADE_LEVEL || player.cash < lm.upgradeCost) return null;
 
-    player.cash -= lm.upgradeCost;
+    let upgCost = lm.upgradeCost;
+    const upgPassive = getPassive(player.characterId);
+    if (upgPassive && upgPassive.id === "upgrade-discount") {
+      upgCost = Math.round(upgCost * (1 - upgPassive.params.discount));
+      this._addLog(`${player.name}'s Architect passive: ${Math.round(upgPassive.params.discount * 100)}% upgrade discount applied.`);
+    }
+    player.cash -= upgCost;
     lm.level    += 1;
     if (st.pendingAction?.landmarkId === lm.id) st.pendingAction = null;
+    st.lastAction = { type: "upgrade", playerId: player.id, spaceIndex: player.position, amount: upgCost };
     this._addLog(`${player.name} upgraded ${lm.name} to ${UPGRADE_LEVELS[lm.level]}, pushing income to $${this._fmt(this._getLandmarkRent(lm))}.`);
     this._checkEnd("upgrade");
     return st;
@@ -374,7 +407,20 @@ export class GameRoom {
 
       st.currentPlayerIndex = nextIndex;
       st.shopStock          = this._generateShopStock();
-      if (wrapped) st.round += 1;
+      if (wrapped) {
+        st.round += 1;
+        // Apply Banker interest passive to all active players at round start
+        this.activePlayers().forEach((p) => {
+          const bankPassive = getPassive(p.characterId);
+          if (bankPassive && bankPassive.id === "interest") {
+            const interest = Math.round(p.cash * bankPassive.params.rate);
+            if (interest > 0) {
+              p.cash += interest;
+              this._addLog(`${p.name}'s Banker passive: earned $${this._fmt(interest)} interest.`);
+            }
+          }
+        });
+      }
 
       if (st.round > this.roundLimit) {
         this._endGame("round-limit");
@@ -395,10 +441,16 @@ export class GameRoom {
     if (!player || !item || player.cash < item.price || player.inventory.length >= 3) return null;
     if (st.turnStarted || st.gameOver) return null;
 
-    player.cash -= item.price;
+    let price = item.price;
+    const tradePassive = getPassive(player.characterId);
+    if (tradePassive && tradePassive.id === "trade-bonus") {
+      price = Math.round(price * (1 - tradePassive.params.discount));
+      this._addLog(`${player.name}'s Merchant passive: ${Math.round(tradePassive.params.discount * 100)}% item discount applied.`);
+    }
+    player.cash -= price;
     player.inventory.push(item.id);
     st.turnStarted = true;
-    this._addLog(`${player.name} purchased ${item.icon} ${item.name} for $${this._fmt(item.price)}.`);
+    this._addLog(`${player.name} purchased ${item.icon} ${item.name} for $${this._fmt(price)}.`);
     return st;
   }
 
@@ -434,7 +486,24 @@ export class GameRoom {
 
   // ── Private helpers ──────────────────────────────────────────────
   _createLandmarkState() {
-    return LANDMARK_DEFS.map((lm) => ({ ...lm, ownerId: null, level: 0 }));
+    // Shuffle landmarks within each phase for variety
+    const byPhase = { Early: [], Mid: [], Late: [] };
+    LANDMARK_DEFS.forEach(lm => byPhase[lm.phase].push({ ...lm }));
+    Object.values(byPhase).forEach(arr => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    });
+    const shuffled = [...byPhase.Early, ...byPhase.Mid, ...byPhase.Late];
+    return shuffled.map((lm, idx) => ({
+      ...lm,
+      cost: LANDMARK_COSTS[idx],
+      baseRent: Math.round(LANDMARK_COSTS[idx] * 0.18),
+      upgradeCost: Math.round(LANDMARK_COSTS[idx] * 0.58),
+      ownerId: null,
+      level: 0,
+    }));
   }
 
   _generateShopStock() {
@@ -576,8 +645,19 @@ export class GameRoom {
     for (let i = 0; i < spaces; i++) {
       player.position = (player.position + 1) % SPACE_DEFS.length;
       if (player.position === 0) {
-        player.cash += PASS_START_BONUS;
-        this._addLog(`${player.name} passed START and collected $${this._fmt(PASS_START_BONUS)}.`);
+        let passBonus = PASS_START_BONUS;
+        const passPassive = getPassive(player.characterId);
+        if (passPassive && passPassive.id === "double-or-nothing") {
+          if (Math.random() < passPassive.params.chance) {
+            passBonus *= 2;
+            this._addLog(`${player.name}'s Gambler passive: doubled the START bonus to $${this._fmt(passBonus)}!`);
+          } else {
+            passBonus = 0;
+            this._addLog(`${player.name}'s Gambler passive: lost the START bonus!`);
+          }
+        }
+        player.cash += passBonus;
+        this._addLog(`${player.name} passed START and collected $${this._fmt(passBonus)}.`);
       }
     }
     this.state.selectedSpaceIndex = player.position;
@@ -618,6 +698,22 @@ export class GameRoom {
         }
       } else {
         let rent = this._getLandmarkRent(lm);
+        // Broker passive: owner gets rent boost
+        const ownerPassive = getPassive(owner.characterId);
+        if (ownerPassive && ownerPassive.id === "rent-boost") {
+          const boost = Math.round(rent * ownerPassive.params.boost);
+          rent += boost;
+          this._addLog(`${owner.name}'s Broker passive: rent boosted by $${this._fmt(boost)}.`);
+        }
+        // Commander passive: rally — if owner has threshold+ landmarks, boost rent
+        if (ownerPassive && ownerPassive.id === "rally") {
+          const owned = this._ownedLandmarks(owner.id).length;
+          if (owned >= ownerPassive.params.threshold) {
+            const boost = Math.round(rent * ownerPassive.params.boost);
+            rent += boost;
+            this._addLog(`${owner.name}'s Commander passive: rally boost +$${this._fmt(boost)} (${owned} landmarks).`);
+          }
+        }
         if (this._hasEffect(player, "diplomatic")) {
           this._consumeEffect(player, "diplomatic");
           this._addLog(`${player.name}'s Diplomatic Immunity blocked rent at ${lm.name}.`);
@@ -630,6 +726,15 @@ export class GameRoom {
             this._addLog(`${player.name}'s Insurance halved rent to $${this._fmt(rent)}.`);
           }
           this._transferCash(player, owner, rent, `${lm.name} income`);
+          // Spy passive: intel cashback — payer gets a percentage back after paying rent
+          const payerPassive = getPassive(player.characterId);
+          if (payerPassive && payerPassive.id === "intel") {
+            const cashback = Math.round(rent * payerPassive.params.cashback);
+            if (cashback > 0) {
+              player.cash += cashback;
+              this._addLog(`${player.name}'s Spy passive: intel gathered, $${this._fmt(cashback)} cashback.`);
+            }
+          }
         }
       }
     }
@@ -638,18 +743,38 @@ export class GameRoom {
 
   _resolveEvent(player, space) {
     switch (space.eventType) {
-      case "start":
-        player.cash += EXACT_START_BONUS;
-        this._addLog(`${player.name} landed exactly on START and banked $${this._fmt(EXACT_START_BONUS)}.`);
+      case "start": {
+        let startBonus = EXACT_START_BONUS;
+        const gamblerPassive = getPassive(player.characterId);
+        if (gamblerPassive && gamblerPassive.id === "double-or-nothing") {
+          if (Math.random() < gamblerPassive.params.chance) {
+            startBonus *= 2;
+            this._addLog(`${player.name}'s Gambler passive: double or nothing — DOUBLED to $${this._fmt(startBonus)}!`);
+          } else {
+            startBonus = 0;
+            this._addLog(`${player.name}'s Gambler passive: double or nothing — lost it all!`);
+          }
+        }
+        player.cash += startBonus;
+        this.state.lastAction = { type: "bonus", playerId: player.id, spaceIndex: player.position, amount: startBonus };
+        this._addLog(`${player.name} landed exactly on START and banked $${this._fmt(startBonus)}.`);
         this._checkEnd("start-bonus");
         return false;
+      }
 
       case "corner-tax":
         if (this._hasEffect(player, "tax-shield")) {
           this._consumeEffect(player, "tax-shield");
           this._addLog(`${player.name}'s Tax Shield absorbed the city tax.`);
         } else {
-          this._applyCharge(player, 150, "city tax");
+          let taxAmount = 150;
+          const taxPassive = getPassive(player.characterId);
+          if (taxPassive && taxPassive.id === "tax-shield") {
+            const reduction = Math.round(taxAmount * taxPassive.params.reduction);
+            taxAmount -= reduction;
+            this._addLog(`${player.name}'s Diplomat passive: tax reduced by $${this._fmt(reduction)}.`);
+          }
+          this._applyCharge(player, taxAmount, "city tax");
         }
         this._checkEnd("corner-tax");
         return false;
@@ -657,6 +782,7 @@ export class GameRoom {
       case "tourism-boom": {
         const p = 120 + this._ownedLandmarks(player.id).length * 25;
         player.cash += p;
+        this.state.lastAction = { type: "bonus", playerId: player.id, spaceIndex: player.position, amount: p };
         this._addLog(`${player.name} capitalized on a Tourism Boom for $${this._fmt(p)}.`);
         this._checkEnd("tourism-boom");
         return false;
@@ -665,6 +791,7 @@ export class GameRoom {
       case "heritage-grant": {
         const p = 80 + this._countDevelopedOrBetter(player.id) * 45;
         player.cash += p;
+        this.state.lastAction = { type: "bonus", playerId: player.id, spaceIndex: player.position, amount: p };
         this._addLog(`${player.name} received a Heritage Grant worth $${this._fmt(p)}.`);
         this._checkEnd("heritage-grant");
         return false;
@@ -673,6 +800,7 @@ export class GameRoom {
       case "media-spotlight": {
         const p = 100 + Math.round(this._highestOwnedRent(player.id) * 0.75);
         player.cash += p;
+        this.state.lastAction = { type: "bonus", playerId: player.id, spaceIndex: player.position, amount: p };
         this._addLog(`${player.name} captured $${this._fmt(p)} from the Tourism Boom crowd surge.`);
         this._checkEnd("media-spotlight");
         return false;
@@ -695,6 +823,7 @@ export class GameRoom {
       case "acquisition-flight": {
         const idx = this._findNextLandmarkIndex(player.position);
         player.cash += 60;
+        this.state.lastAction = { type: "bonus", playerId: player.id, spaceIndex: player.position, amount: 60 };
         this._addLog(`${player.name} took the Charter Flight, earned $60, and is moving.`);
         this._moveToIndexAndResolve(player, idx);
         return true;
@@ -708,28 +837,45 @@ export class GameRoom {
 
       case "free-parking":
         player.cash += 50;
+        this.state.lastAction = { type: "bonus", playerId: player.id, spaceIndex: player.position, amount: 50 };
         this._addLog(`${player.name} pulled into Free Parking and collected $50.`);
         this._checkEnd("free-parking");
         return false;
 
       case "restoration-bill": {
-        const loss = 70 + Math.round(this._getUpgradeAssetValue(player) * 0.15);
+        let loss = 70 + Math.round(this._getUpgradeAssetValue(player) * 0.15);
+        const restTaxPassive = getPassive(player.characterId);
+        if (restTaxPassive && restTaxPassive.id === "tax-shield") {
+          const reduction = Math.round(loss * restTaxPassive.params.reduction);
+          loss -= reduction;
+          this._addLog(`${player.name}'s Diplomat passive: restoration bill reduced by $${this._fmt(reduction)}.`);
+        }
         this._applyCharge(player, loss, "restoration bill");
         this._checkEnd("restoration-bill");
         return false;
       }
 
       case "world-event": {
+        const oraclePassive = getPassive(player.characterId);
         const roll = Math.floor(Math.random() * 3);
         if (roll === 0) {
-          const p = 140 + this._ownedLandmarks(player.id).length * 30;
+          let p = 140 + this._ownedLandmarks(player.id).length * 30;
+          if (oraclePassive && oraclePassive.id === "foresight") {
+            p = Math.round(p * oraclePassive.params.multiplier);
+            this._addLog(`${player.name}'s Oracle passive: foresight doubled the world event bonus!`);
+          }
           player.cash += p;
+          this.state.lastAction = { type: "bonus", playerId: player.id, spaceIndex: player.position, amount: p };
           this._addLog(`${player.name} hit a favorable World Event and gained $${this._fmt(p)}.`);
           this._checkEnd("world-event-bonus");
           return false;
         }
         if (roll === 1) {
-          const loss = 110 + this._totalUpgradeCount(player.id) * 18;
+          let loss = 110 + this._totalUpgradeCount(player.id) * 18;
+          if (oraclePassive && oraclePassive.id === "foresight") {
+            loss = Math.round(loss / oraclePassive.params.multiplier);
+            this._addLog(`${player.name}'s Oracle passive: foresight halved the world event penalty!`);
+          }
           this._applyCharge(player, loss, "world event shock");
           this._checkEnd("world-event-tax");
           return false;
@@ -749,12 +895,14 @@ export class GameRoom {
   _transferCash(from, to, amount, label) {
     from.cash -= amount;
     to.cash   += amount;
+    this.state.lastAction = { type: "rent", fromId: from.id, toId: to.id, spaceIndex: from.position, amount };
     this._addLog(`${from.name} paid $${this._fmt(amount)} to ${to.name} for ${label}.`);
     this._stabilize(from);
   }
 
   _applyCharge(player, amount, label) {
     player.cash -= amount;
+    this.state.lastAction = { type: "tax", playerId: player.id, spaceIndex: player.position, amount };
     this._addLog(`${player.name} lost $${this._fmt(amount)} to ${label}.`);
     this._stabilize(player);
   }
