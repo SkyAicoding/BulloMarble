@@ -247,9 +247,26 @@ io.on("connection", (socket) => {
       console.log(`[room] deleted ${code} (empty)`);
     } else {
       if (wasHost) room.players[0].isHost = true;
-      io.to(code).emit("player_left", { players: room.players, socketId: socket.id });
-      if (room.started && room.activePlayers().length <= 1) {
-        io.to(code).emit("state_update", room.forceEndGame());
+      if (room.started) {
+        // Mid-game disconnect
+        const leavingPlayer = room.state?.players.find(p => p.socketId === socket.id);
+        const leavingName = leavingPlayer?.name ?? "A player";
+        const remainingActive = room.activePlayers().length;
+        console.log(`[game] ${leavingName} left mid-game in ${code} (${remainingActive} active remaining)`);
+        io.to(code).emit("player_left", {
+          players: room.players,
+          socketId: socket.id,
+          duringGame: true,
+          leavingName,
+          remainingActive,
+        });
+        if (remainingActive <= 1) {
+          // Only one (or zero) players left — end the game
+          io.to(code).emit("state_update", room.forceEndGame());
+        }
+      } else {
+        // Lobby disconnect: just update player list
+        io.to(code).emit("player_left", { players: room.players, socketId: socket.id });
       }
     }
     broadcastRoomList();

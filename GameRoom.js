@@ -261,6 +261,7 @@ export class GameRoom {
     const player = this._currentPlayer();
     if (!player || st.turnBusy || st.turnStarted || st.gameOver || player.bankrupt) return null;
 
+    st.lastAction = null;
     st.turnBusy = true;
     st.rolling  = false;
 
@@ -374,6 +375,8 @@ export class GameRoom {
     const player = this._currentPlayer();
     if (!player || st.turnBusy || st.gameOver || !st.turnStarted) return null;
 
+    st.lastAction = null;
+
     if (this._hasEffect(player, "time-warp")) {
       this._consumeEffect(player, "time-warp");
       this._addLog(`${player.name} activates Time Warp — taking an extra turn!`);
@@ -441,6 +444,7 @@ export class GameRoom {
     if (!player || !item || player.cash < item.price || player.inventory.length >= 3) return null;
     if (st.turnStarted || st.gameOver) return null;
 
+    st.lastAction = null;
     let price = item.price;
     const tradePassive = getPassive(player.characterId);
     if (tradePassive && tradePassive.id === "trade-bonus") {
@@ -458,6 +462,7 @@ export class GameRoom {
     const st     = this.state;
     const player = this._currentPlayer();
     if (!player) return null;
+    st.lastAction = null;
     const idx = player.inventory.indexOf(itemId);
     if (idx >= 0) player.inventory.splice(idx, 1);
     const item = ITEM_DEFS.find((d) => d.id === itemId);
@@ -473,6 +478,7 @@ export class GameRoom {
 
     const idx = player.inventory.indexOf(itemId);
     if (idx < 0) return null;
+    st.lastAction = null;
 
     player.inventory.splice(idx, 1);
     this._applyItemEffect(item, player, targetId);

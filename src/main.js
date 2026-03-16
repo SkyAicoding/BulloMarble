@@ -1655,14 +1655,17 @@ function renderPlayers() {
           <span class="rank-badge-label">${medal.label}</span>
         </div>` : "";
 
+      const isMe = gameMode === "network" && networkSocket && player.socketId === networkSocket.id;
+
       return `
-        <article class="player-card ${index === state.currentPlayerIndex && !state.gameOver ? "current" : ""} ${player.bankrupt ? "bankrupt" : ""}"
+        <article class="player-card ${index === state.currentPlayerIndex && !state.gameOver ? "current" : ""} ${player.bankrupt ? "bankrupt" : ""} ${isMe ? "is-me" : ""}"
           style="--owner-color:${player.color}; --owner-glow:${player.glow};"
           data-player-id="${player.id}">
           <div class="player-card-band" style="background:${player.color};">
             <span class="player-marker-chip" style="color:#07131e;">P${player.marker}</span>
             <strong class="player-card-name" style="color:#07131e;">${player.name}</strong>
           </div>
+          ${isMe ? `<span class="me-badge-label">ME</span>` : ""}
           ${player.character ? `<div class="player-card-bg-portrait" style="background-image:url('${player.character.portrait}');"></div>` : ""}
           <div class="player-card-metrics">
             <div class="metric-asset-row">
@@ -3221,6 +3224,73 @@ function flashPanel(playerId, color, type) {
 
 // ── Orchestrated money effects ────────────────────────────────────────────
 
+// ── Player-left notification ───────────────────────────────────────────────
+// gameOver=true  → modal with "Back to Menu" button (last player standing)
+// gameOver=false → auto-dismiss toast (game continues)
+function _showPlayerLeftModal(name, gameOver) {
+  if (gameOver) {
+    const el = document.createElement("div");
+    el.id = "abandonNotice";
+    el.style.cssText = [
+      "position:fixed", "inset:0", "background:rgba(0,0,0,0.78)",
+      "display:flex", "align-items:center", "justify-content:center",
+      "z-index:99999", "font-family:inherit",
+    ].join(";");
+    el.innerHTML = `
+      <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.13);border-radius:18px;
+                  padding:2.5rem 3rem;text-align:center;max-width:360px;box-shadow:0 8px 40px rgba(0,0,0,0.6);">
+        <div style="font-size:2.8rem;margin-bottom:0.8rem;">🚪</div>
+        <h2 style="color:#fff;margin:0 0 0.5rem;font-size:1.25rem;font-weight:700;">
+          ${name} has left the game
+        </h2>
+        <p style="color:rgba(255,255,255,0.5);margin:0 0 1.8rem;font-size:0.9rem;line-height:1.5;">
+          You are the only player remaining.<br>The game has ended.
+        </p>
+        <button
+          style="background:#5b8dee;color:#fff;border:none;border-radius:9px;
+                 padding:0.7rem 2.2rem;font-size:1rem;cursor:pointer;font-weight:600;"
+          onclick="document.getElementById('abandonNotice').remove(); lobbyExit();">
+          Back to Menu
+        </button>
+      </div>`;
+    document.body.appendChild(el);
+  } else {
+    const toast = document.createElement("div");
+    toast.style.cssText = [
+      "position:fixed", "top:1.4rem", "left:50%", "transform:translateX(-50%)",
+      "background:rgba(20,20,35,0.92)", "color:#fff",
+      "padding:0.65rem 1.4rem", "border-radius:10px",
+      "z-index:99999", "font-size:0.9rem", "font-weight:500",
+      "border:1px solid rgba(255,255,255,0.12)",
+      "box-shadow:0 4px 20px rgba(0,0,0,0.4)",
+      "pointer-events:none",
+    ].join(";");
+    toast.textContent = `🚪 ${name} has left the game`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+}
+
+function _triggerActionFx(act) {
+  if (act.type === "buy") {
+    const p = state.players.find(pl => pl.id === act.playerId);
+    if (p) fxBuyLandmark(p, act.spaceIndex, act.amount);
+  } else if (act.type === "rent") {
+    const from = state.players.find(pl => pl.id === act.fromId);
+    const to   = state.players.find(pl => pl.id === act.toId);
+    if (from && to) fxRentPayment(from, to, act.spaceIndex, act.amount);
+  } else if (act.type === "bonus") {
+    const p = state.players.find(pl => pl.id === act.playerId);
+    if (p) fxBonusGain(p, act.spaceIndex, act.amount);
+  } else if (act.type === "tax") {
+    const p = state.players.find(pl => pl.id === act.playerId);
+    if (p) fxTaxCharge(p, act.spaceIndex, act.amount);
+  } else if (act.type === "upgrade") {
+    const p = state.players.find(pl => pl.id === act.playerId);
+    if (p) fxUpgradeLandmark(p, act.spaceIndex, act.amount);
+  }
+}
+
 function fxBuyLandmark(player, spaceIndex, cost) {
   const panelEl = _getPlayerPanelEl(player.id);
   const tileEl  = _getBoardTileEl(spaceIndex);
@@ -4777,9 +4847,21 @@ function attachSocketHandlers(socket) {
     renderLobby();
   });
 
-  socket.on("player_left", ({ players }) => {
+  socket.on("player_left", ({ players, duringGame, leavingName, remainingActive }) => {
     lobbyState.players = players;
-    renderLobby();
+    if (duringGame && gameMode === "network") {
+      if (remainingActive <= 1) {
+        // I'm the only one left — show exit modal
+        stopTurnTimer();
+        _showPlayerLeftModal(leavingName, true);
+      } else {
+        // Game continues — show toast and re-render player panels
+        _showPlayerLeftModal(leavingName, false);
+        render();
+      }
+    } else {
+      renderLobby();
+    }
   });
 
   socket.on("rooms_updated", (rooms) => {
@@ -4832,12 +4914,15 @@ function attachSocketHandlers(socket) {
     const wasRolling = state.rolling;
     // If rolling, delay applying state so dice animation plays
     if (wasRolling) {
-      const savedDice = serverState.dice;
+      const savedAction = serverState.lastAction;
       state.rolling = true; // keep rolling
       setTimeout(() => {
         applyServerState(serverState);
         state.rolling = false;
         render();
+        if (savedAction) {
+          requestAnimationFrame(() => _triggerActionFx(savedAction));
+        }
       }, 600);
       return;
     }
@@ -4845,26 +4930,7 @@ function attachSocketHandlers(socket) {
 
     // Trigger money effects based on lastAction from server
     if (serverState.lastAction) {
-      const act = serverState.lastAction;
-      requestAnimationFrame(() => {
-        if (act.type === "buy") {
-          const p = state.players.find(pl => pl.id === act.playerId);
-          if (p) fxBuyLandmark(p, act.spaceIndex, act.amount);
-        } else if (act.type === "rent") {
-          const from = state.players.find(pl => pl.id === act.fromId);
-          const to   = state.players.find(pl => pl.id === act.toId);
-          if (from && to) fxRentPayment(from, to, act.spaceIndex, act.amount);
-        } else if (act.type === "bonus") {
-          const p = state.players.find(pl => pl.id === act.playerId);
-          if (p) fxBonusGain(p, act.spaceIndex, act.amount);
-        } else if (act.type === "tax") {
-          const p = state.players.find(pl => pl.id === act.playerId);
-          if (p) fxTaxCharge(p, act.spaceIndex, act.amount);
-        } else if (act.type === "upgrade") {
-          const p = state.players.find(pl => pl.id === act.playerId);
-          if (p) fxUpgradeLandmark(p, act.spaceIndex, act.amount);
-        }
-      });
+      requestAnimationFrame(() => _triggerActionFx(serverState.lastAction));
     }
 
     if (serverState.gameOver) {
@@ -4931,6 +4997,19 @@ function applyServerState(serverState) {
     preserved.turnTimerSeconds = state.turnTimerSeconds;
   }
   Object.assign(state, serverState, preserved);
+
+  // Remap pendingAction.landmarkId from server's World Landmarks ID to client seed's ID.
+  // Server always uses World Landmarks IDs; client may use a different seed.
+  // Use the current player's board position to look up the correct client-side landmark ID.
+  if (state.pendingAction?.type === "buy" || state.pendingAction?.type === "upgrade") {
+    const player = state.players[state.currentPlayerIndex];
+    if (player) {
+      const space = SPACE_DEFS[player.position];
+      if (space?.type === "landmark") {
+        state.pendingAction.landmarkId = space.landmarkId;
+      }
+    }
+  }
 }
 
 // ── Room actions ──────────────────────────────────────────────────────────
